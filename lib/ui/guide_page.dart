@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../data/calibers.dart';
 import '../data/components.dart';
 import '../data/steps.dart';
 import '../logic/beat_analyzer.dart';
@@ -10,6 +11,8 @@ import '../logic/revision.dart';
 import '../logic/store.dart';
 import 'glossary_page.dart';
 import 'measure_page.dart';
+import 'how_it_works_page.dart';
+import 'scene_widgets.dart';
 import 'step_timer.dart';
 import 'theme.dart';
 
@@ -249,7 +252,14 @@ class _GuidePageState extends State<GuidePage> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          StepScene(
+            steps: _steps,
+            index: _i,
+            automatic: r.caliber.type == WindType.automatic,
+            date: r.hasDate,
+          ),
+          const SizedBox(height: 12),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -282,6 +292,14 @@ class _GuidePageState extends State<GuidePage> {
           ),
           const SizedBox(height: 12),
           InfoBox(icon: Icons.lightbulb_outline, title: 'Perché', text: step.why, color: Brand.blu),
+          if (_howTab(step.id) != null) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => openHowItWorks(context, tab: _howTab(step.id)!.$1),
+              icon: const Icon(Icons.play_circle_outline),
+              label: Text('Guarda l\'animazione: ${_howTab(step.id)!.$2}'),
+            ),
+          ],
           if (step.warning != null) ...[
             const SizedBox(height: 10),
             InfoBox(icon: Icons.warning_amber_rounded, title: 'Attenzione', text: step.warning!, color: Colors.red.shade700),
@@ -435,4 +453,27 @@ class _GuidePageState extends State<GuidePage> {
     } catch (_) {}
     await widget.store.save();
   }
+}
+
+(int, String)? _howTab(String stepId) {
+  switch (stepId) {
+    case 'bilanciere':
+    case 'ancora':
+    case 'ancora_in':
+    case 'bilanciere_in':
+    case 'regola':
+      return (0, 'lo scappamento');
+    case 'treno_out':
+    case 'treno_in':
+    case 'scarica':
+      return (1, 'il percorso dell\'energia');
+    case 'stelo':
+    case 'remontoir_out':
+    case 'remontoir_in':
+      return (2, 'la corona e il remontoir');
+    case 'bariletto_apri':
+    case 'bariletto_in':
+      return (3, 'la briglia');
+  }
+  return null;
 }

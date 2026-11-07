@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'logic/revision.dart';
 import 'logic/store.dart';
 import 'ui/glossary_page.dart';
+import 'ui/how_it_works_page.dart';
+import 'ui/scene_widgets.dart';
 import 'ui/guide_page.dart';
 import 'ui/identify_page.dart';
 import 'ui/measure_page.dart';
@@ -81,17 +83,30 @@ class _HomePageState extends State<HomePage> {
                     label: const Text('Nuova revisione'),
                   ),
                   const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(
-                      child: _Tile(
+                  GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.95,
+                    children: [
+                      _Tile(
+                        icon: Icons.layers_outlined,
+                        label: 'Esplora il\nmovimento',
+                        onTap: () => _push(const ExplorePage()),
+                      ),
+                      _Tile(
+                        icon: Icons.play_circle_outline,
+                        label: 'Come\nfunziona',
+                        onTap: () => _push(const HowItWorksPage()),
+                      ),
+                      _Tile(
                         icon: Icons.menu_book_outlined,
                         label: 'A cosa serve\nogni pezzo',
                         onTap: () => _push(const GlossaryPage()),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _Tile(
+                      _Tile(
                         icon: Icons.search,
                         label: 'Identifica\nil calibro',
                         onTap: () async {
@@ -102,16 +117,13 @@ class _HomePageState extends State<HomePage> {
                           if (c != null && mounted) _push(NewRevisionPage(store: store, preset: c));
                         },
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _Tile(
+                      _Tile(
                         icon: Icons.graphic_eq,
                         label: 'Misura\nmarcia',
                         onTap: () => _push(const MeasurePage()),
                       ),
-                    ),
-                  ]),
+                    ],
+                  ),
                   const SizedBox(height: 26),
                   Text('Le tue revisioni', style: Brand.sora(18, 800, color: Brand.inchiostro)),
                   const SizedBox(height: 10),
@@ -175,8 +187,8 @@ class _Tile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-          child: Column(children: [
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(icon, color: Brand.blu, size: 28),
             const SizedBox(height: 8),
             Text(label,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../art/part_art.dart';
 import '../data/components.dart';
 import 'theme.dart';
 
@@ -19,10 +20,15 @@ class PartCard extends StatelessWidget {
           initiallyExpanded: initiallyExpanded,
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          leading: const CircleAvatar(
-            radius: 16,
-            backgroundColor: Brand.blu,
-            child: Icon(Icons.settings, size: 18, color: Brand.carta),
+          leading: SizedBox(
+            width: 48,
+            height: 48,
+            child: artSpecFor(part.id) == null
+                ? const CircleAvatar(
+                    backgroundColor: Brand.blu,
+                    child: Icon(Icons.settings, size: 20, color: Brand.carta),
+                  )
+                : PartArt(partId: part.id, height: 48, labels: false),
           ),
           title: Text(part.name, style: Brand.sora(15.5, 700, color: Brand.inchiostro)),
           subtitle: Padding(
@@ -30,6 +36,10 @@ class PartCard extends StatelessWidget {
             child: Text(part.whatItDoes, style: const TextStyle(fontSize: 14, height: 1.35)),
           ),
           children: [
+            if (artSpecFor(part.id) != null) ...[
+              PartArt(partId: part.id, height: 190),
+              const SizedBox(height: 8),
+            ],
             Align(
               alignment: Alignment.centerLeft,
               child: Text('Detto anche: ${part.aka}',
