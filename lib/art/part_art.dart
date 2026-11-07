@@ -207,7 +207,7 @@ class PartArtPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final hasLabels = labels && spec.callouts.isNotEmpty;
-    final margin = hasLabels ? size.width * 0.27 : 6.0;
+    final margin = hasLabels ? size.width * 0.3 : 6.0;
     final avail = Rect.fromLTWH(margin, 8, size.width - 2 * margin, size.height - 16);
 
     Rect bounds;
@@ -250,12 +250,59 @@ class PartArtPainter extends CustomPainter {
     canvas.restore();
 
     if (!hasLabels) return;
-    final fs = (size.height / 15).clamp(10.0, 13.0);
-    for (final c in spec.callouts) {
-      final t = off + c.target * k;
-      final lx = c.left ? margin - 6 : size.width - margin + 6;
-      final ly = (t.dy + c.dy).clamp(fs, size.height - fs);
-      drawCallout(canvas, t, Offset(lx, ly), c.label, fs);
+    final fs = (size.height / 15).clamp(10.0, 12.5);
+    final maxW = margin - 14;
+    // etichette per lato, ordinate e distanziate per non sovrapporsi
+    for (final left in [true, false]) {
+      final list = spec.callouts.where((c) => c.left == left).toList();
+      if (list.isEmpty) continue;
+      final entries = <(Callout, Offset, TextPainter, double)>[];
+      for (final c in list) {
+        final t = off + c.target * k;
+        final tp = TextPainter(
+          text: TextSpan(
+            text: c.label,
+            style: TextStyle(fontSize: fs, color: ArtColors.ink, fontWeight: FontWeight.w600, height: 1.15),
+          ),
+          textDirection: TextDirection.ltr,
+          textAlign: left ? TextAlign.right : TextAlign.left,
+        )..layout(maxWidth: maxW);
+        entries.add((c, t, tp, t.dy + c.dy));
+      }
+      entries.sort((a, b) => a.$4.compareTo(b.$4));
+      final ys = <double>[];
+      var cursor = 2.0;
+      for (final e in entries) {
+        final h = e.$3.height + 6;
+        final top = math.max(cursor, e.$4 - h / 2);
+        ys.add(top);
+        cursor = top + h + 3;
+      }
+      // se si esce in basso, risali
+      var overflow = cursor - 3 - (size.height - 2);
+      for (var i = entries.length - 1; i >= 0 && overflow > 0; i--) {
+        ys[i] -= overflow;
+        if (i > 0) {
+          final prevBottom = ys[i - 1] + entries[i - 1].$3.height + 9;
+          overflow = prevBottom - ys[i];
+        } else {
+          overflow = 0;
+        }
+      }
+      for (var i = 0; i < entries.length; i++) {
+        final e = entries[i];
+        final tp = e.$3;
+        final boxW = tp.width + 10;
+        final boxH = tp.height + 6;
+        final x = left ? margin - 6 - boxW : size.width - margin + 6;
+        final box = RRect.fromRectAndRadius(Rect.fromLTWH(x, ys[i], boxW, boxH), const Radius.circular(6));
+        final anchor = Offset(left ? box.right : box.left, ys[i] + boxH / 2);
+        canvas.drawLine(e.$2, anchor, strokePaint(ArtColors.ink.withValues(alpha: 0.7), 1.3));
+        canvas.drawCircle(e.$2, 3.5, fillPaint(ArtColors.highlight));
+        canvas.drawRRect(box, fillPaint(Colors.white.withValues(alpha: 0.95)));
+        canvas.drawRRect(box, strokePaint(ArtColors.highlight, 1));
+        tp.paint(canvas, Offset(x + 5, ys[i] + 3));
+      }
     }
   }
 
