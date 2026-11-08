@@ -27,6 +27,22 @@ if [ "$(uname)" = "Darwin" ] && [ -f "$PLIST" ]; then
 fi
 [ -f ios/Podfile ] && sed -i.bak "s/^# platform :ios.*/platform :ios, '13.0'/" ios/Podfile || true
 
+# ML Kit: gli script non latini non sono inclusi, R8 non deve cercarli
+cat > android/app/proguard-rules.pro <<'PRO'
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**
+PRO
+if ! grep -q 'proguard-rules.pro' "$GRADLE"; then
+  if [[ "$GRADLE" == *.kts ]]; then
+    sed -i 's#signingConfig = signingConfigs.getByName("debug")#signingConfig = signingConfigs.getByName("debug")\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")#' "$GRADLE"
+  else
+    sed -i "s#signingConfig signingConfigs.debug#signingConfig signingConfigs.debug\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'#" "$GRADLE"
+  fi
+fi
+grep -n "proguard" "$GRADLE" || true
+
 flutter pub get
 dart run flutter_launcher_icons
 grep -n "RECORD_AUDIO\|android:label" "$MANIFEST"
