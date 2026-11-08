@@ -39,6 +39,71 @@ class Measurement {
       );
 }
 
+/// Una vite segnata su una tua foto (coordinate 0..1).
+class Mark {
+  double x;
+  double y;
+  double r;
+  bool leftHand;
+  bool out; // svitata
+  bool back; // riavvitata
+
+  Mark(this.x, this.y, this.r, {this.leftHand = false, this.out = false, this.back = false});
+
+  Map<String, dynamic> toJson() => {'x': x, 'y': y, 'r': r, 'lh': leftHand, 'o': out, 'b': back};
+  factory Mark.fromJson(Map<String, dynamic> j) => Mark(
+        (j['x'] as num).toDouble(),
+        (j['y'] as num).toDouble(),
+        (j['r'] as num?)?.toDouble() ?? 0.03,
+        leftHand: j['lh'] == true,
+        out: j['o'] == true,
+        back: j['b'] == true,
+      );
+}
+
+/// La tua foto di un passo con le viti segnate e lo scomparto dove vanno.
+class PhotoMarks {
+  String photo;
+  final List<Mark> marks;
+  String? compartment;
+  String source; // 'offline', 'AI', 'manuale'
+  String? tip;
+  double aspect; // larghezza / altezza della foto
+
+  PhotoMarks(this.photo, this.marks, {this.compartment, this.source = 'offline', this.tip, this.aspect = 0.75});
+
+  Map<String, dynamic> toJson() => {
+        'photo': photo,
+        'marks': marks.map((m) => m.toJson()).toList(),
+        if (compartment != null) 'comp': compartment,
+        'src': source,
+        if (tip != null) 'tip': tip,
+        'ar': aspect,
+      };
+  factory PhotoMarks.fromJson(Map<String, dynamic> j) => PhotoMarks(
+        j['photo'] as String,
+        ((j['marks'] as List?) ?? const []).map((m) => Mark.fromJson(Map<String, dynamic>.from(m as Map))).toList(),
+        compartment: j['comp'] as String?,
+        source: (j['src'] as String?) ?? 'offline',
+        tip: j['tip'] as String?,
+        aspect: (j['ar'] as num?)?.toDouble() ?? 0.75,
+      );
+}
+
+/// Quali passi di smontaggio corrispondono a un passo di rimontaggio.
+const Map<String, List<String>> reassemblyOf = {
+  'bariletto_in': ['bariletto_apri'],
+  'remontoir_in': ['stelo', 'remontoir_out'],
+  'treno_in': ['treno_out'],
+  'bariletto_rimonta': ['bariletto_out', 'carica'],
+  'ancora_in': ['ancora'],
+  'antiurto_in': ['antiurto_out'],
+  'bilanciere_in': ['bilanciere'],
+  'automatico_in': ['automatico'],
+  'quadrante_in': ['minuteria', 'calendario', 'quadrante', 'lancette'],
+  'chiudi': ['estrai', 'rotore', 'fondello'],
+};
+
 class Revision {
   final String id;
   String watchName;
@@ -50,6 +115,7 @@ class Revision {
   final Map<String, String> notes;
   final Map<String, List<String>> photos; // stepId -> file path
   final List<Measurement> measurements;
+  final Map<String, PhotoMarks> marks;
   int currentIndex;
 
   Revision({
@@ -63,12 +129,24 @@ class Revision {
     Map<String, String>? notes,
     Map<String, List<String>>? photos,
     List<Measurement>? measurements,
+    Map<String, PhotoMarks>? marks,
     this.currentIndex = 0,
   })  : done = done ?? <String>{},
         skipped = skipped ?? <String>{},
         notes = notes ?? <String, String>{},
         photos = photos ?? <String, List<String>>{},
-        measurements = measurements ?? <Measurement>[];
+        measurements = measurements ?? <Measurement>[],
+        marks = marks ?? <String, PhotoMarks>{};
+
+  /// Prossima lettera libera per lo scomparto del contenitore.
+  String nextCompartment() {
+    final used = marks.values.map((m) => m.compartment).whereType<String>().toSet();
+    for (var i = 0; i < 26; i++) {
+      final l = String.fromCharCode(65 + i);
+      if (!used.contains(l)) return l;
+    }
+    return '+';
+  }
 
   Caliber get caliber => caliberById(caliberId);
 
@@ -95,6 +173,7 @@ class Revision {
         'notes': notes,
         'photos': photos,
         'measurements': measurements.map((m) => m.toJson()).toList(),
+        'marks': marks.map((k, v) => MapEntry(k, v.toJson())),
         'currentIndex': currentIndex,
       };
 
@@ -112,6 +191,8 @@ class Revision {
         measurements: ((j['measurements'] as List?) ?? const [])
             .map((m) => Measurement.fromJson(Map<String, dynamic>.from(m as Map)))
             .toList(),
+        marks: ((j['marks'] as Map?) ?? const {})
+            .map((k, v) => MapEntry(k as String, PhotoMarks.fromJson(Map<String, dynamic>.from(v as Map)))),
         currentIndex: (j['currentIndex'] as num?)?.toInt() ?? 0,
       );
 

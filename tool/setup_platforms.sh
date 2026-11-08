@@ -12,6 +12,9 @@ MANIFEST=android/app/src/main/AndroidManifest.xml
 if ! grep -q RECORD_AUDIO "$MANIFEST"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application#' "$MANIFEST"
 fi
+if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+  sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$MANIFEST"
+fi
 sed -i 's#android:label="d_fix_watch_lab"#android:label="D. Fix Watch Lab"#' "$MANIFEST"
 
 PLIST=ios/Runner/Info.plist
@@ -19,6 +22,7 @@ if [ "$(uname)" = "Darwin" ] && [ -f "$PLIST" ]; then
   /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Per ascoltare il ticchettio e misurare la marcia.'" "$PLIST" || true
   /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Per fotografare i passi della revisione.'" "$PLIST" || true
   /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Per allegare foto ai passi.'" "$PLIST" || true
+  /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST" || true
   /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'D. Fix Watch Lab'" "$PLIST" || true
 fi
 [ -f ios/Podfile ] && sed -i.bak "s/^# platform :ios.*/platform :ios, '13.0'/" ios/Podfile || true

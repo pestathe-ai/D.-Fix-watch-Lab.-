@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'logic/revision.dart';
 import 'logic/store.dart';
+import 'ui/ai_settings_page.dart';
 import 'ui/glossary_page.dart';
 import 'ui/how_it_works_page.dart';
 import 'ui/scene_widgets.dart';
@@ -72,7 +73,14 @@ class _HomePageState extends State<HomePage> {
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 children: [
-                  Text('D. Fix Watch Lab', style: Brand.sora(28, 800, color: Brand.inchiostro)),
+                  Row(children: [
+                    Expanded(child: Text('D. Fix Watch Lab', style: Brand.sora(28, 800, color: Brand.inchiostro))),
+                    IconButton(
+                      tooltip: 'AI facoltativa',
+                      onPressed: () => _push(const AiSettingsPage()),
+                      icon: const Icon(Icons.auto_awesome_outlined, color: Brand.blu),
+                    ),
+                  ]),
                   const SizedBox(height: 4),
                   Text('La revisione del tuo orologio, passo passo.',
                       style: TextStyle(fontSize: 15, color: Brand.inchiostro.withValues(alpha: 0.7))),

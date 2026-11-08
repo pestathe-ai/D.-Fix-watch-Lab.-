@@ -13,6 +13,7 @@ import '../logic/store.dart';
 import 'glossary_page.dart';
 import 'measure_page.dart';
 import 'how_it_works_page.dart';
+import 'photo_marks.dart';
 import 'scene3d.dart';
 import 'scene_widgets.dart';
 import 'step_timer.dart';
@@ -271,6 +272,19 @@ class _GuidePageState extends State<GuidePage> {
               ),
             ),
           ],
+          if (_photoSteps.contains(step.id) || reassemblyOf.containsKey(step.id)) ...[
+            const SizedBox(height: 14),
+            MyWatchCard(
+              key: ValueKey('mw-${step.id}'),
+              revision: r,
+              store: widget.store,
+              step: step,
+              steps: _steps,
+              index: _i,
+              automatic: r.caliber.type == WindType.automatic,
+              date: r.hasDate,
+            ),
+          ],
           const SizedBox(height: 14),
           if (_use3d && !_noGl)
             StepScene3D(
@@ -507,3 +521,9 @@ class _GuidePageState extends State<GuidePage> {
   }
   return null;
 }
+
+/// Passi di smontaggio in cui l'app chiede una foto del tuo movimento.
+const _photoSteps = {
+  'fondello', 'rotore', 'stelo', 'estrai', 'lancette', 'quadrante', 'calendario', 'minuteria', 'automatico',
+  'bilanciere', 'ancora', 'carica', 'bariletto_out', 'treno_out', 'remontoir_out', 'antiurto_out', 'bariletto_apri',
+};

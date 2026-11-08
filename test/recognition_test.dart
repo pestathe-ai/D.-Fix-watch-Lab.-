@@ -1,0 +1,194 @@
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:d_fix_watch_lab/data/calibers.dart';
+import 'package:d_fix_watch_lab/data/steps.dart';
+import 'package:d_fix_watch_lab/logic/caliber_match.dart';
+import 'package:d_fix_watch_lab/logic/gemini.dart';
+import 'package:d_fix_watch_lab/logic/revision.dart';
+import 'package:d_fix_watch_lab/logic/screw_detector.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Immagine sintetica: fondo metallico, due ruote dorate, un ponte, viti con fessura, rubini.
+(Uint8List, int, int, List<(double, double, double)>) synthMovement({bool blue = false, int seed = 3}) {
+  const w = 480, h = 360;
+  final rnd = math.Random(seed);
+  final px = Float64List(w * h * 3);
+  void set(int x, int y, double r, double g, double b) {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    final i = (y * w + x) * 3;
+    px[i] = r;
+    px[i + 1] = g;
+    px[i + 2] = b;
+  }
+
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      final n = (rnd.nextDouble() - 0.5) * 0.06;
+      set(x, y, 0.71 + n, 0.72 + n, 0.75 + n);
+    }
+  }
+  void disc(double cx, double cy, double r, double cr, double cg, double cb) {
+    for (var y = (cy - r).floor(); y <= (cy + r).ceil(); y++) {
+      for (var x = (cx - r).floor(); x <= (cx + r).ceil(); x++) {
+        final d = math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+        if (d <= r) set(x, y, cr, cg, cb);
+        if (d > r - 1.2 && d <= r) set(x, y, cr * 0.5, cg * 0.5, cb * 0.5);
+      }
+    }
+  }
+
+  disc(120, 110, 70, 0.84, 0.70, 0.38);
+  disc(330, 210, 90, 0.84, 0.70, 0.38);
+  for (final j in const [(160, 80), (300, 240), (400, 120)]) {
+    disc(j.$1.toDouble(), j.$2.toDouble(), 6, 0.78, 0.12, 0.35);
+  }
+  final screws = <(double, double, double)>[(90, 280, 11), (230, 250, 9), (210, 320, 10), (380, 60, 13), (440, 300, 9)];
+  for (final s in screws) {
+    if (blue) {
+      disc(s.$1, s.$2, s.$3, 0.17, 0.30, 0.70);
+    } else {
+      disc(s.$1, s.$2, s.$3, 0.80, 0.81, 0.83);
+    }
+    final a = rnd.nextDouble() * math.pi;
+    for (var l = -s.$3 * 0.85; l <= s.$3 * 0.85; l += 0.5) {
+      for (var t = -1.2; t <= 1.2; t += 0.6) {
+        set((s.$1 + l * math.cos(a) - t * math.sin(a)).round(), (s.$2 + l * math.sin(a) + t * math.cos(a)).round(), 0.2, 0.2, 0.23);
+      }
+    }
+  }
+  final rgba = Uint8List(w * h * 4);
+  for (var i = 0; i < w * h; i++) {
+    rgba[i * 4] = (px[i * 3].clamp(0.0, 1.0) * 255).round();
+    rgba[i * 4 + 1] = (px[i * 3 + 1].clamp(0.0, 1.0) * 255).round();
+    rgba[i * 4 + 2] = (px[i * 3 + 2].clamp(0.0, 1.0) * 255).round();
+    rgba[i * 4 + 3] = 255;
+  }
+  return (rgba, w, h, screws);
+}
+
+void main() {
+  group('Riconoscimento dalle scritte', () {
+    test('ETA 2824-2 con 25 rubini', () {
+      final r = matchEngravings('SWISS MADE\nETA 2824-2\nTWENTY-FIVE 25 JEWELS\nUNADJUSTED');
+      expect(r.guesses.first.caliber.id, 'eta2824');
+      expect(r.jewels, 25);
+    });
+    test('Seiko NH35A anche con errori di lettura', () {
+      expect(matchEngravings('NH3SA\nTWENTY FOUR JEWELS').guesses.first.caliber.id, 'nh35');
+      expect(matchEngravings('NH 35 A').guesses.first.caliber.id, 'nh35');
+    });
+    test('Sellita con spazi e trattini', () {
+      expect(matchEngravings('SELLITA SW 200-1').guesses.first.caliber.id, 'sw200');
+    });
+    test('Miyota e Unitas', () {
+      expect(matchEngravings('MIYOTA 8215 21 JEWELS').guesses.first.caliber.id, 'miyota8215');
+      expect(matchEngravings('UNITAS 6497 17 RUBIS').guesses.first.caliber.id, 'eta6497');
+    });
+    test('rubini in numeri romani', () {
+      expect(matchEngravings('XXV JEWELS').jewels, 25);
+    });
+    test('cronografo riconosciuto e segnalato', () {
+      final g = matchEngravings('VALJOUX 7750').guesses.first.caliber;
+      expect(g.chrono, isTrue);
+    });
+    test('testo senza calibro: nessun candidato', () {
+      expect(matchEngravings('SWISS MADE ADJUSTED').guesses, isEmpty);
+    });
+    test('ogni calibro ha scritte riconoscibili', () {
+      for (final c in calibers.where((c) => !c.generic)) {
+        expect(c.engravings, isNotEmpty, reason: c.id);
+        final g = matchEngravings(c.engravings.first).guesses;
+        expect(g.map((x) => x.caliber.id), contains(c.id), reason: c.id);
+      }
+    });
+  });
+
+  group('Risposte di Gemini', () {
+    String wrap(Map<String, dynamic> j) => jsonEncode({
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': '```json\n${jsonEncode(j)}\n```'},
+                ],
+              },
+            },
+          ],
+        });
+
+    test('calibro', () {
+      final j = parseGeminiJson(wrap({'caliber_id': 'nh35', 'caliber_text': 'NH35A', 'confidence': 0.9, 'reason': 'scritta visibile'}));
+      final g = geminiCaliberGuesses(j);
+      expect(g.first.caliber.id, 'nh35');
+      expect(g.first.source, 'AI');
+    });
+    test('calibro sconosciuto: sequenza universale', () {
+      final g = geminiCaliberGuesses({'caliber_id': null, 'name': 'Peseux 7001', 'automatic': false, 'confidence': 0.7});
+      expect(g.first.caliber.id, 'generic_manual');
+      expect(g.first.why.first, contains('Peseux 7001'));
+    });
+    test('viti in box_2d', () {
+      final j = parseGeminiJson(wrap({
+        'screws': [
+          {'box_2d': [100, 200, 140, 240], 'this_step': true, 'part': 'ponte del treno'},
+          {'box_2d': [500, 500, 540, 540], 'this_step': false},
+        ],
+        'tip': 'Occhio al perno.',
+      }));
+      final s = geminiScrews(j);
+      expect(s.screws.length, 1);
+      expect(s.screws.first.x, closeTo(0.22, 1e-9));
+      expect(s.screws.first.y, closeTo(0.12, 1e-9));
+      expect(s.tip, 'Occhio al perno.');
+    });
+  });
+
+  group('Viti trovate sulla foto (offline)', () {
+    for (final blue in [false, true]) {
+      test(blue ? 'viti azzurrate' : 'viti in acciaio', () {
+        final (rgba, w, h, truth) = synthMovement(blue: blue);
+        final found = detectScrews(rgba, w, h);
+        var hits = 0;
+        for (final t in truth) {
+          final ok = found.any((f) {
+            final dx = f.x * w - t.$1, dy = f.y * h - t.$2;
+            return math.sqrt(dx * dx + dy * dy) < t.$3 * 0.6;
+          });
+          if (ok) hits++;
+        }
+        expect(hits, greaterThanOrEqualTo(truth.length - 1), reason: 'trovate $hits di ${truth.length}');
+        expect(found.length, lessThanOrEqualTo(truth.length + 2), reason: 'troppe: ${found.length}');
+      });
+    }
+    test('immagine vuota', () {
+      expect(detectScrews(Uint8List(0), 0, 0), isEmpty);
+    });
+  });
+
+  group('Mappa del tuo orologio', () {
+    test('salvataggio delle viti segnate e scomparti', () {
+      final r = Revision(id: '1', watchName: 'x', caliberId: 'nh35', hasDate: true, started: DateTime(2026));
+      expect(r.nextCompartment(), 'A');
+      r.marks['treno_out'] = PhotoMarks('/a.jpg', [Mark(0.2, 0.3, 0.02, leftHand: true, out: true)], compartment: 'A', aspect: 1.33);
+      expect(r.nextCompartment(), 'B');
+      final back = Revision.decodeList(Revision.encodeList([r])).single;
+      final pm = back.marks['treno_out']!;
+      expect(pm.compartment, 'A');
+      expect(pm.aspect, 1.33);
+      expect(pm.marks.single.leftHand, isTrue);
+      expect(pm.marks.single.out, isTrue);
+    });
+    test('ogni passo di rimontaggio rimanda a passi di smontaggio esistenti e precedenti', () {
+      final ids = universalSteps.map((s) => s.id).toList();
+      for (final e in reassemblyOf.entries) {
+        expect(ids, contains(e.key));
+        for (final src in e.value) {
+          expect(ids, contains(src), reason: src);
+          expect(ids.indexOf(src), lessThan(ids.indexOf(e.key)), reason: '${e.key} <- $src');
+        }
+      }
+    });
+  });
+}

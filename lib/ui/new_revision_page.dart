@@ -5,6 +5,7 @@ import '../logic/revision.dart';
 import '../logic/store.dart';
 import 'guide_page.dart';
 import 'identify_page.dart';
+import 'recognize_page.dart';
 import 'theme.dart';
 
 class NewRevisionPage extends StatefulWidget {
@@ -68,7 +69,17 @@ class _NewRevisionPageState extends State<NewRevisionPage> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () async {
+              final c = await Navigator.push<Caliber>(context, MaterialPageRoute(builder: (_) => const RecognizePage()));
+              if (c != null) _pick(c);
+            },
+            style: FilledButton.styleFrom(backgroundColor: Brand.arancio),
+            icon: const Icon(Icons.photo_camera),
+            label: const Text('Riconosci il movimento da una foto'),
+          ),
+          const SizedBox(height: 16),
           Row(children: [
             Expanded(child: Text('Calibro', style: Brand.sora(16, 800, color: Brand.inchiostro))),
             TextButton.icon(
