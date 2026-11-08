@@ -2,6 +2,12 @@
 
 Guida passo passo alla revisione di orologi meccanici (automatici e a carica manuale), con la spiegazione di ogni pezzo.
 
+## Novità v0.5
+- **Aspetto più realistico**: metalli fisici, righe di Ginevra con riflessi che cambiano girando il pezzo, perlage, viti azzurrate con riflessi viola, ombre morbide. Menu qualità alta/normale.
+- **Movimento vivo**: il bilanciere batte, l'ancora e la ruota di scappamento vanno a scatti, il treno gira a rapporti reali, le lancette segnano l'ora vera; tic-tac sincronizzato (pulsante audio). Si ferma da solo se manca un pezzo.
+- **Come funziona in 3D**: scappamento al rallentatore con le fasi spiegate, percorso dell'energia, corona e remontoir (stelo tirato, pignone che cambia ingranaggio), bariletto aperto con molla e briglia.
+- **Smontaggio realistico**: pinzette che prendono i pezzi e li posano sul tappetino, viti col filetto, ponte del bilanciere che si inclina uscendo, oliatore che mette la goccia nei rubini.
+
 ## Novità v0.4
 - **Riconosci il movimento da una foto**: legge le scritte incise (calibro, rubini) offline e propone il calibro; archivio ampliato (ETA, Sellita, Seiko, Miyota, Unitas, cloni, cronografi).
 - **Sul tuo orologio**: a ogni passo di smontaggio fotografi il movimento, l'app segna da sola le viti, le numera, assegna lo scomparto del contenitore; tocchi le viti man mano che le togli.

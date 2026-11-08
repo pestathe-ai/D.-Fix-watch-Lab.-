@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Movimento 3D</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #eef0f4; touch-action: none;
+  html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #eef1f6 0%, #d3d9e3 70%, #bcc4d1 100%); touch-action: none;
     -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   #c { display: block; width: 100%; height: 100%; }
   #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -14,11 +14,18 @@
     align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.25);
     border: 2px solid #fff; }
   .lbl.on { background: #f28c38; transform-origin: center; }
+  #vig { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 55%, rgba(10,18,40,.28) 100%); }
+  #live { position: absolute; left: 10px; bottom: 10px; display: none; gap: 6px; }
+  #live button { width: 42px; height: 42px; border-radius: 21px; border: 0; background: rgba(29,58,138,.92);
+    color: #fff; font: 700 15px/1 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="vig"></div>
 <div id="labels"></div>
+<div id="live"><button id="lp-play">▶</button><button id="lp-speed">1×</button><button id="lp-sound">🔈</button></div>
 <script src="app.js"></script>
 </body>
 </html>

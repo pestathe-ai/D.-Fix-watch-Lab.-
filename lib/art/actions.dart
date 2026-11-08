@@ -69,7 +69,7 @@ const Map<String, String> liftWith = {
   'q_cassa': 'p_cassa',
 };
 
-enum ActionType { unscrew, screw, lift, lower, press, letdown, regulate }
+enum ActionType { unscrew, screw, lift, lower, press, letdown, regulate, oil }
 
 class SceneAction {
   final ActionType type;
@@ -78,13 +78,15 @@ class SceneAction {
   final String? detail; // seconda riga (es. verso di rotazione)
   final bool warn;
   final Offset? at;
+  final List<Offset> points; // punti da oliare
 
-  const SceneAction(this.type, this.ids, this.text, {this.detail, this.warn = false, this.at});
+  const SceneAction(this.type, this.ids, this.text, {this.detail, this.warn = false, this.at, this.points = const []});
 
   Map<String, dynamic> toJson() => {
         't': type.name,
         'ids': ids,
         if (at != null) 'at': [at!.dx, at!.dy],
+        if (points.isNotEmpty) 'pts': [for (final p in points) [p.dx, p.dy]],
         if (type == ActionType.unscrew || type == ActionType.screw)
           'lh': screwById(ids.first)?.leftHand ?? false,
       };
@@ -230,6 +232,16 @@ List<SceneAction> actionsFor(ServiceStep step, Set<String> present, {required bo
       }
     }
   }
+    final oil = _oilPoints[step.id];
+    if (oil != null && (present.contains(oil.$1) || out.any((a) => a.type == ActionType.lower && a.ids.contains(oil.$1)))) {
+      out.add(SceneAction(
+        ActionType.oil,
+        [oil.$1],
+        oil.$2,
+        detail: step.lube,
+        points: oil.$3,
+      ));
+    }
   return out;
 }
 
@@ -260,6 +272,7 @@ Set<String> applyAction(Set<String> present, SceneAction a) {
     case ActionType.press:
     case ActionType.letdown:
     case ActionType.regulate:
+    case ActionType.oil:
       break;
   }
   return out;
@@ -275,3 +288,13 @@ Set<String> presentWithScrewsBefore(List<ServiceStep> steps, int index, {require
   }
   return present;
 }
+
+/// Dove si mette l'olio nei passi di rimontaggio: (pezzo, testo, punti).
+const Map<String, (String, String, List<Offset>)> _oilPoints = {
+  'treno_in': (
+    'ponte_treno',
+    'Metti una goccina d\'olio in ogni rubino del ponte del treno',
+    [Geo.center, Geo.third, Geo.fourth, Geo.escape],
+  ),
+  'ancora_in': ('ponte_ancora', 'Una goccina d\'olio nel rubino dell\'ancora', [Geo.pallet]),
+};

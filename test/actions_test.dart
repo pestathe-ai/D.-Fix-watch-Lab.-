@@ -105,4 +105,16 @@ void main() {
       }
     }
   });
+
+  test('rimontando il treno si oliano i 4 rubini', () {
+    final steps = stepsFor(WindType.automatic, true);
+    final i = steps.indexWhere((s) => s.id == 'treno_in');
+    final p = presentWithScrewsBefore(steps, i, automatic: true, date: true);
+    final acts = actionsFor(steps[i], p, automatic: true, date: true);
+    final oil = acts.last;
+    expect(oil.type, ActionType.oil);
+    expect(oil.points.length, 4);
+    expect((oil.toJson()['pts'] as List).length, 4);
+    expect(oil.detail, isNotNull);
+  });
 }

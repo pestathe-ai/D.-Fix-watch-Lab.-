@@ -6,12 +6,13 @@ import 'package:flutter/scheduler.dart';
 import '../art/anim_math.dart';
 import '../art/draw.dart';
 import '../art/scene.dart' show drawEscapeWheel, drawBalance, drawHands;
+import 'how_it_works_3d.dart';
 import 'theme.dart';
 
-/// Pagina "Come funziona": quattro animazioni interattive.
-class HowItWorksPage extends StatelessWidget {
+/// Versione 2D (ripiego per i telefoni senza grafica 3D).
+class HowItWorks2D extends StatelessWidget {
   final int initialTab;
-  const HowItWorksPage({super.key, this.initialTab = 0});
+  const HowItWorks2D({super.key, this.initialTab = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -737,6 +738,14 @@ class _BridlePainter extends CustomPainter {
 }
 
 /// Accesso rapido usato da altre pagine.
+class HowItWorksPage extends StatelessWidget {
+  final int initialTab;
+  const HowItWorksPage({super.key, this.initialTab = 0});
+
+  @override
+  Widget build(BuildContext context) => HowItWorks3D(initialTab: initialTab);
+}
+
 void openHowItWorks(BuildContext context, {int tab = 0}) {
   Navigator.push(context, MaterialPageRoute(builder: (_) => HowItWorksPage(initialTab: tab)));
 }

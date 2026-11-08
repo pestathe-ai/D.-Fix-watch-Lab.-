@@ -125,23 +125,25 @@ function makeTex(w, h, draw, repeat = 1) {
   t.anisotropy = 4;
   return t;
 }
-const texStripes = () => makeTex(256, 256, (g, w, h) => {
+const texStripes = (rough = false) => makeTex(256, 256, (g, w, h) => {
   const img = g.createImageData(w, h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const p = ((x + y) % 64) / 64;
-    const v = 168 + 84 * Math.pow(Math.sin(p * Math.PI), 2);
+    const band = Math.pow(Math.sin(p * Math.PI), 2);
+    const v = rough ? 150 - 90 * band + ((x * 7 + y * 13) % 11) : 168 + 84 * band;
     const i = (y * w + x) * 4;
     img.data[i] = v; img.data[i + 1] = v + 2; img.data[i + 2] = v + 6; img.data[i + 3] = 255;
   }
   g.putImageData(img, 0, 0);
-}, 1 / 14);
-const texPerlage = () => makeTex(256, 256, (g, w, h) => {
-  g.fillStyle = '#c9ced6'; g.fillRect(0, 0, w, h);
+}, 1 / 7);
+const texPerlage = (rough = false) => makeTex(256, 256, (g, w, h) => {
+  g.fillStyle = rough ? '#8a8a8a' : '#c9ced6'; g.fillRect(0, 0, w, h);
   const step = 32;
   for (let row = -1; row <= h / step + 1; row++) for (let col = -1; col <= w / step + 1; col++) {
     const cx = col * step + (row % 2 ? step / 2 : 0), cy = row * step * 0.87;
     const gr = g.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, 22);
-    gr.addColorStop(0, '#f2f4f7'); gr.addColorStop(0.55, '#c3c9d2'); gr.addColorStop(1, '#dfe3e9');
+    if (rough) { gr.addColorStop(0, '#404040'); gr.addColorStop(0.6, '#909090'); gr.addColorStop(1, '#6a6a6a'); }
+    else { gr.addColorStop(0, '#f2f4f7'); gr.addColorStop(0.55, '#c3c9d2'); gr.addColorStop(1, '#dfe3e9'); }
     g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, 21, 0, TAU); g.fill();
   }
 }, 1 / 7);
@@ -198,22 +200,37 @@ const texDateRing = () => {
   return t;
 };
 
+const texNoise = () => makeTex(256, 256, (g, w, h) => {
+  const img = g.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const v = 225 + Math.floor(Math.random() * 30);
+    img.data[i * 4] = v; img.data[i * 4 + 1] = v; img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}, 6);
+
 // ------------------------------------------------------------------ materiali
 let TX = null;
 function tex() {
-  if (!TX) TX = { stripes: texStripes(), perlage: texPerlage(), grain10: texGrain(21), grain5: texGrain(11), grain42: texGrain(86), dial: texDial(), date: texDateRing() };
+  if (!TX) TX = { stripes: texStripes(), stripesR: texStripes(true), perlage: texPerlage(), perlageR: texPerlage(true), grain10: texGrain(21), grain5: texGrain(11), grain42: texGrain(86), dial: texDial(), date: texDateRing() };
   return TX;
 }
+let HQ = true;
+try {
+  const q = localStorage.getItem('w3d_quality');
+  HQ = q ? q === 'high' : (navigator.hardwareConcurrency || 4) >= 6;
+} catch (e) { /* ignora */ }
 const std = (o) => new THREE.MeshStandardMaterial(o);
+const phys = (o) => (HQ ? new THREE.MeshPhysicalMaterial(o) : std(Object.fromEntries(Object.entries(o).filter(([k]) => !['clearcoat', 'clearcoatRoughness', 'anisotropy', 'anisotropyRotation', 'iridescence', 'iridescenceIOR', 'iridescenceThicknessRange', 'sheen', 'sheenColor', 'sheenRoughness'].includes(k)))));
 const MAT = {
-  brass: () => std({ color: 0xd9ad58, metalness: 0.9, roughness: 0.3 }),
-  gold: () => std({ color: 0xe0b862, metalness: 0.92, roughness: 0.26 }),
-  steel: () => std({ color: 0xd5dbe3, metalness: 0.95, roughness: 0.22 }),
-  steelMatte: () => std({ color: 0xc8ced7, metalness: 0.85, roughness: 0.42 }),
-  bridge: () => std({ color: 0xf2f4f8, metalness: 0.8, roughness: 0.34, map: tex().stripes }),
-  plate: () => std({ color: 0xd2d7df, metalness: 0.75, roughness: 0.48, map: tex().perlage }),
+  brass: () => phys({ color: 0xd9ad58, metalness: 1, roughness: 0.3, clearcoat: 0.2 }),
+  gold: () => phys({ color: 0xe6bd68, metalness: 1, roughness: 0.22, clearcoat: 0.35, clearcoatRoughness: 0.15, anisotropy: 0.35 }),
+  steel: () => phys({ color: 0xdfe4ea, metalness: 1, roughness: 0.13, clearcoat: 0.2 }),
+  steelMatte: () => phys({ color: 0xc8ced7, metalness: 0.95, roughness: 0.38 }),
+  bridge: () => phys({ color: 0xf4f6f9, metalness: 0.95, roughness: 0.3, map: tex().stripes, roughnessMap: tex().stripesR, anisotropy: 0.75, anisotropyRotation: Math.PI / 4, clearcoat: 0.15, clearcoatRoughness: 0.2 }),
+  plate: () => phys({ color: 0xd6dbe2, metalness: 0.9, roughness: 0.42, map: tex().perlage, roughnessMap: tex().perlageR }),
   ruby: () => new THREE.MeshPhysicalMaterial({ color: 0xc2185b, metalness: 0, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05, emissive: 0x2a0010 }),
-  blue: () => std({ color: 0x2a4cb0, metalness: 0.75, roughness: 0.28 }),
+  blue: () => phys({ color: 0x2346b5, metalness: 0.85, roughness: 0.2, iridescence: 0.85, iridescenceIOR: 1.8, iridescenceThicknessRange: [220, 620], clearcoat: 0.4 }),
   dark: () => std({ color: 0x141a28, metalness: 0.3, roughness: 0.6 }),
   spring: () => std({ color: 0x6d7c90, metalness: 0.9, roughness: 0.3 }),
   hands: () => std({ color: 0x1d2b4a, metalness: 0.6, roughness: 0.35 }),
@@ -222,7 +239,8 @@ const MAT = {
   dial: () => std({ color: 0xffffff, metalness: 0, roughness: 0.55, map: tex().dial }),
   dateRing: () => std({ color: 0xffffff, metalness: 0, roughness: 0.6, map: tex().date }),
   heavy: () => std({ color: 0x9aa1ab, metalness: 0.9, roughness: 0.35 }),
-  case: () => std({ color: 0xe2e6ec, metalness: 1.0, roughness: 0.16 }),
+  case: () => phys({ color: 0xe6eaef, metalness: 1.0, roughness: 0.1, clearcoat: 0.5, clearcoatRoughness: 0.08 }),
+  oil: () => phys({ color: 0xd9a441, metalness: 0, roughness: 0.03, clearcoat: 1, transparent: true, opacity: 0.85 }),
 };
 function at(m, pt, y = 0) { m.position.set(X3(pt[0]), y, Z3(pt[1])); return m; }
 function mesh(geo, mat, cast = true) {
@@ -266,7 +284,7 @@ const STEM_Y = -3.9;
 const items = {}; // id -> {obj, part, dir, face, cover}
 function addItem(id, part, obj, { dir = 1, face = 0, cover = false } = {}) {
   obj.name = id;
-  obj.userData = { id, part };
+  obj.userData = { ...obj.userData, id, part };
   items[id] = { id, obj, part, dir, face, cover, base: { p: obj.position.clone(), q: obj.quaternion.clone() } };
   return obj;
 }
@@ -471,19 +489,23 @@ function build(mv) {
   // ===== stelo e corona
   mv.add(addItem('stelo', 'stelo', (() => {
     const g = new THREE.Group();
+    g.position.set(0, STEM_Y, 0);
     const stem = mesh(cyl(0.85, 0, 18, 16), MAT.steel());
     stem.rotation.z = Math.PI / 2;
-    stem.position.set(X3(860), STEM_Y, 0);
+    stem.position.set(X3(860), 0, 0);
     g.add(stem);
+    const sq = mesh(new THREE.BoxGeometry(5, 1.2, 1.2), MAT.steel());
+    sq.position.set((X3(885) + X3(935)) / 2, 0, 0);
+    g.add(sq);
     const crownG = extrude([gearRing(C0, 46, 44, 0, 5)], 0, 3.0, 0.3);
     crownG.translate(0, -1.5, 0);
     const crown = mesh(crownG, MAT.case());
     crown.rotation.z = Math.PI / 2;
-    crown.position.set(X3(1050), STEM_Y, 0);
+    crown.position.set(X3(1050), 0, 0);
     g.add(crown);
     const cap = mesh(cyl(3.6, 0, 0.4, 32), MAT.case());
     cap.rotation.z = -Math.PI / 2;
-    cap.position.set(X3(1050) - 1.5, STEM_Y, 0);
+    cap.position.set(X3(1050) - 1.5, 0, 0);
     g.add(cap);
     return g;
   })(), { dir: 1 }));
@@ -500,10 +522,10 @@ function build(mv) {
   })(), { dir: -1, face: -3.55 }));
   const sidePinion = (pt, r, len) => {
     const g = new THREE.Group();
+    g.position.set(X3(pt[0]), STEM_Y, Z3(pt[1]));
     const geo = extrude([gearRing(C0, r, 10)], -len / 2, len, 0.04);
     const m = mesh(geo, MAT.steel());
     m.rotation.z = Math.PI / 2;
-    m.position.set(X3(pt[0]), STEM_Y, Z3(pt[1]));
     g.add(m);
     return g;
   };
@@ -589,10 +611,14 @@ function build(mv) {
   })(), { dir: -1, face: -7.6, cover: true }));
   mv.add(addItem('lancette', 'lancette', (() => {
     const g = new THREE.Group();
-    const hourA = -Math.PI / 2 - Math.PI / 3, minA = -Math.PI / 2 + Math.PI / 3, secA = Math.PI / 2;
-    g.add(mesh(extrude(taper(C0, polar(C0, 250, hourA), 30, 10), -8.2, 0.2, 0.03), MAT.hands()));
-    g.add(mesh(extrude(taper(C0, polar(C0, 370, minA), 22, 8), -8.7, 0.2, 0.03), MAT.hands()));
-    g.add(mesh(extrude(bar(polar(C0, 80, secA + Math.PI), polar(C0, 400, secA), 6), -9.1, 0.12, 0.02), MAT.orange()));
+    const up = -Math.PI / 2;
+    const hh = mesh(extrude(taper(C0, polar(C0, 250, up), 30, 10), -8.2, 0.2, 0.03), MAT.hands());
+    const mm = mesh(extrude(taper(C0, polar(C0, 370, up), 22, 8), -8.7, 0.2, 0.03), MAT.hands());
+    const ss = mesh(extrude(bar(polar(C0, 80, up + Math.PI), polar(C0, 400, up), 6), -9.1, 0.12, 0.02), MAT.orange());
+    hh.name = 'h'; mm.name = 'm'; ss.name = 's';
+    g.add(hh, mm, ss);
+    g.userData.hands = { h: hh, m: mm, s: ss };
+    setHands(g, 10 * 3600 + 10 * 60 + 30);
     g.add(mesh(cyl(1.2, -9.2, -7.6, 24), MAT.hands()));
     return g;
   })(), { dir: -1, face: -9.2, cover: true }));
@@ -630,6 +656,15 @@ function build(mv) {
   })(), { dir: 1, face: 16.3, cover: true }));
 }
 
+/// Lancette all'ora indicata (secondi dalla mezzanotte). Rotazione positiva = oraria vista dal quadrante.
+function setHands(g, secs) {
+  const H = g.userData.hands;
+  if (!H) return;
+  H.s.rotation.y = ((secs % 60) / 60) * TAU;
+  H.m.rotation.y = ((secs % 3600) / 3600) * TAU;
+  H.h.rotation.y = ((secs % 43200) / 43200) * TAU;
+}
+
 // ------------------------------------------------------------------ viti
 const screws = {}; // id -> {id,item,lh,outer,spin,base}
 function buildScrew(def) {
@@ -646,6 +681,15 @@ function buildScrew(def) {
   slot.rotation.y = (def.x * 7 + def.y) % 3;
   spin.add(slot);
   spin.add(mesh(cyl(r * 0.45, -2.4, 0, 12), MAT.blue()));
+  {
+    const pts = [];
+    const rr = r * 0.45 + 0.04;
+    for (let i = 0; i <= 120; i++) {
+      const t = i / 120, a = t * 6 * TAU;
+      pts.push(new THREE.Vector3(Math.cos(a) * rr, -2.3 + 2.1 * t, Math.sin(a) * rr));
+    }
+    spin.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.07, 5), MAT.blue(), false));
+  }
   outer.add(spin);
   outer.name = def.id;
   outer.userData = { id: def.id, part: 'viti' };
@@ -654,7 +698,9 @@ function buildScrew(def) {
 }
 
 // ------------------------------------------------------------------ scena
-let renderer, scene, camera, controls, mv, tray, driver, needle, arrow;
+let renderer, scene, camera, controls, mv, tray, driver, needle, arrow, tweezers, oiler, matGroup;
+const MAT_X = 76;
+const beads = [];
 let present = new Set();
 let highlight = new Set();
 let numbered = [];
@@ -677,22 +723,24 @@ const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
 function init() {
   const canvas = document.getElementById('c');
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   } catch (e) {
     send({ type: 'nogl', msg: String(e) });
     return;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMapping = THREE.NeutralToneMapping || THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.95;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = HQ ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x000000, 0);
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xdfe3ea);
+  scene.background = null;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
+  scene.environmentIntensity = 1.05;
 
   camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 1, 1000);
   camera.position.set(0, 112, 64);
@@ -707,20 +755,40 @@ function init() {
   const key = new THREE.DirectionalLight(0xffffff, 1.7);
   key.position.set(-35, 110, 45);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(HQ ? 2048 : 1024, HQ ? 2048 : 1024);
+  key.shadow.radius = HQ ? 6 : 2;
+  key.shadow.blurSamples = 12;
   key.shadow.camera.left = -62; key.shadow.camera.right = 62;
   key.shadow.camera.top = 62; key.shadow.camera.bottom = -62;
   key.shadow.camera.near = 10; key.shadow.camera.far = 260;
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.02;
   scene.add(key);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x7f8798, 0.55));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x7f8798, 0.45));
+  const rim = new THREE.DirectionalLight(0xdfe8ff, 0.55);
+  rim.position.set(70, 40, -60);
+  scene.add(rim);
 
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(170, 96), std({ color: 0x22304d, metalness: 0, roughness: 0.95 }));
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(190, 96), std({ color: 0x22304d, metalness: 0, roughness: 0.95, map: texNoise() }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -16;
   floor.receiveShadow = true;
   scene.add(floor);
+  // tappetino dei pezzi
+  matGroup = new THREE.Group();
+  const matShape = new THREE.Shape();
+  const mw = 46, mh = 92, mr = 5;
+  matShape.moveTo(-mw / 2 + mr, -mh / 2); matShape.lineTo(mw / 2 - mr, -mh / 2); matShape.quadraticCurveTo(mw / 2, -mh / 2, mw / 2, -mh / 2 + mr);
+  matShape.lineTo(mw / 2, mh / 2 - mr); matShape.quadraticCurveTo(mw / 2, mh / 2, mw / 2 - mr, mh / 2); matShape.lineTo(-mw / 2 + mr, mh / 2);
+  matShape.quadraticCurveTo(-mw / 2, mh / 2, -mw / 2, mh / 2 - mr); matShape.lineTo(-mw / 2, -mh / 2 + mr); matShape.quadraticCurveTo(-mw / 2, -mh / 2, -mw / 2 + mr, -mh / 2);
+  const matGeo = new THREE.ExtrudeGeometry(matShape, { depth: 0.6, bevelEnabled: false });
+  matGeo.rotateX(-Math.PI / 2);
+  const matMesh = new THREE.Mesh(matGeo, std({ color: 0x5d7f6e, roughness: 0.95, metalness: 0 }));
+  matMesh.receiveShadow = true;
+  matGroup.add(matMesh);
+  matGroup.position.set(MAT_X, -15.9, 0);
+  matGroup.visible = false;
+  scene.add(matGroup);
 
   mv = new THREE.Group();
   scene.add(mv);
@@ -745,6 +813,38 @@ function init() {
   driver.add(mesh(cyl(1.55, 19, 20.5, 24), std({ color: 0xf28c38, roughness: 0.5 })));
   driver.visible = false;
   scene.add(driver);
+
+  // pinzette
+  tweezers = new THREE.Group();
+  const prongGeo = new THREE.BoxGeometry(0.7, 20, 1.6);
+  prongGeo.translate(0, 10, 0);
+  for (const sgn of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.y = 20;
+    const prong = mesh(prongGeo.clone(), MAT.steel());
+    prong.position.y = -20;
+    pivot.add(prong);
+    pivot.userData.sgn = sgn;
+    tweezers.add(pivot);
+  }
+  tweezers.add(mesh(cyl(1.0, 19.5, 21, 16), MAT.steel()));
+  tweezers.visible = false;
+  scene.add(tweezers);
+  setTweezers(1);
+
+  // oliatore
+  oiler = new THREE.Group();
+  const otip = mesh(new THREE.ConeGeometry(0.18, 6, 12), MAT.steel());
+  otip.rotation.x = Math.PI;
+  otip.position.y = 3;
+  oiler.add(otip);
+  oiler.add(mesh(cyl(0.6, 6, 20, 16), std({ color: 0x1d3a8a, roughness: 0.5 })));
+  const drop = mesh(new THREE.SphereGeometry(0.32, 16, 12), MAT.oil(), false);
+  drop.position.y = 0.15;
+  oiler.add(drop);
+  oiler.userData.drop = drop;
+  oiler.visible = false;
+  scene.add(oiler);
 
   // punta (per premere / sollevare)
   needle = new THREE.Group();
@@ -846,6 +946,7 @@ function isPresent(id) {
 function cancelTweens() {
   const old = tweens.splice(0, tweens.length);
   for (const t of old) if (t.fail) t.fail(ABORT);
+  for (const c of [...scene.children]) if (c.userData && c.userData.holder) scene.remove(c);
   driver.visible = false;
   needle.visible = false;
   arrow.visible = false;
@@ -858,12 +959,28 @@ function applyState(st) {
   numbered = st.numbered || [];
   xray = !!st.xray;
   const trayIds = st.tray || [];
+  const matIds = (st.mat || []).map(res);
+  for (const b of beads.splice(0)) b.parent && b.parent.remove(b);
+  tweezers.visible = false;
+  oiler.visible = false;
+  let mk = 0;
   for (const it of Object.values(items)) {
+    if (it.obj.parent !== mv) mv.add(it.obj);
+    it.busy = false;
+    it.obj.scale.set(1, 1, 1);
     resetObj(it, it.obj);
     if (it.id === 'cricchetto' || it.id === 'rocchetto_cricco' || it.id === 'racchetta') resetObj(it, it.obj);
     it.obj.visible = isPresent(it.id);
     setOpacity(it.obj, xray && it.cover ? 0.22 : 1);
   }
+  for (const id of [...new Set(matIds)]) {
+    const it = items[id];
+    if (!it || isPresent(id)) continue;
+    it.obj.visible = true;
+    placeOnMat(it, mk++, false);
+  }
+  matCount = mk;
+  matGroup.visible = mk > 0 || !!st.showMat;
   let k = 0;
   for (const s of Object.values(screws)) {
     if (s.outer.parent !== mv) mv.add(s.outer);
@@ -882,6 +999,7 @@ function applyState(st) {
   }
   tray.visible = trayIds.length > 0 || !!st.showTray;
   trayCount = k;
+  if (st.live) setLive(st.live);
   if (st.side && st.side !== side) flipTo(st.side, st.animate !== false);
   else mv.rotation.z = side === 'quadrante' ? Math.PI : 0;
   if (st.focus) focusOn(st.focus, st.animate !== false, st.zoom);
@@ -941,6 +1059,7 @@ function worldBox(ids) {
 }
 function focusOn(ids, animate = true, zoom = 1) {
   let center = new THREE.Vector3(0, 0, 0), radius = 52;
+  if ((!ids || !ids.length) && matGroup && matGroup.visible) { center = new THREE.Vector3(MAT_X / 2 - 4, 0, 0); radius = 66; }
   if (ids && ids.length) {
     const b = worldBox(ids);
     if (!b.isEmpty()) {
@@ -1040,8 +1159,14 @@ async function unscrew(s, inward) {
   }
 }
 
+const BIG = new Set(['cassa', 'fondello', 'stelo', 'rotore', 'quadrante', 'platina', 'lancette']);
 async function liftItems(ids, down) {
-  const objs = [...new Set(ids.map(res))].map((id) => items[id]).filter(Boolean);
+  const objs0 = [...new Set(ids.map(res))].map((id) => items[id]).filter(Boolean);
+  if (objs0.length && !objs0.some((o) => BIG.has(o.id))) {
+    if (down) return lowerWithTweezers(objs0);
+    return liftWithTweezers(objs0);
+  }
+  const objs = objs0;
   for (const it of objs) {
     it.obj.visible = true;
     setOpacity(it.obj, 1);
@@ -1148,6 +1273,8 @@ function play(action, seq) {
         await letdown();
       } else if (t === 'regulate') {
         await regulate();
+      } else if (t === 'oil') {
+        await oilAt(action.ids[0], action.pts || []);
       }
     } catch (e) {
       if (e === ABORT) { send({ type: 'aborted', seq }); return; }
@@ -1157,9 +1284,512 @@ function play(action, seq) {
   });
 }
 
+// ------------------------------------------------------------------ pinzette, tappetino, olio
+let matCount = 0;
+function setTweezers(open) {
+  for (const c of tweezers.children) if (c.userData.sgn) c.rotation.z = c.userData.sgn * (0.025 + 0.06 * open);
+}
+function matSlot(k) {
+  const col = k % 2, row = Math.floor(k / 2);
+  return new THREE.Vector3(MAT_X - 10 + col * 20, -15.2, -32 + row * 21);
+}
+/// Mette un pezzo sul tappetino (scala ridotta), con o senza animazione.
+function placeOnMat(it, k, animate) {
+  const o = it.obj;
+  scene.attach(o);
+  const p0 = o.position.clone(), s0 = o.scale.clone();
+  // posizione finale: il centro del pezzo sullo slot, appoggiato sul tappetino
+  o.scale.setScalar(0.5);
+  o.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(o);
+  const c = b.getCenter(new THREE.Vector3());
+  const slot = matSlot(k);
+  const end = p0.clone().add(new THREE.Vector3(slot.x - c.x, slot.y - b.min.y, slot.z - c.z));
+  o.scale.copy(s0);
+  if (!animate) { o.position.copy(end); o.scale.setScalar(0.5); return { end }; }
+  return { end, p0, s0 };
+}
+function grabPoint(o) {
+  o.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(o);
+  const c = b.getCenter(new THREE.Vector3());
+  return new THREE.Vector3(c.x, b.max.y, c.z);
+}
+async function liftWithTweezers(objs) {
+  matGroup.visible = true;
+  const lead = objs[0];
+  for (const it of objs) { it.busy = true; it.obj.visible = true; setOpacity(it.obj, 1); }
+  // gruppo temporaneo: i pezzi si muovono insieme
+  const holder = new THREE.Group();
+  holder.userData.holder = true;
+  scene.add(holder);
+  const g = grabPoint(lead.obj);
+  holder.position.copy(g);
+  holder.updateMatrixWorld(true);
+  for (const it of objs) holder.attach(it.obj);
+  tweezers.visible = true;
+  setTweezers(1);
+  tweezers.position.copy(g).add(new THREE.Vector3(0, 18, 0));
+  tweezers.rotation.set(0, 0.5, 0.12);
+  await run(500, (p) => tweezers.position.y = g.y + 18 * (1 - ease(p)) - 0.4);
+  await run(250, (p) => setTweezers(1 - p));
+  const tilt = lead.id === 'ponte_bilanciere' ? 0.22 : 0.08;
+  const h0 = holder.position.clone();
+  await run(700, (p) => {
+    const e = ease(p);
+    holder.position.y = h0.y + 14 * e;
+    holder.rotation.x = tilt * Math.sin(e * Math.PI);
+    holder.rotation.y = (lead.id === 'ponte_bilanciere' ? 0.15 : 0) * Math.sin(e * Math.PI);
+    tweezers.position.y = holder.position.y - 0.4;
+  });
+  // verso il tappetino
+  const k = matCount++;
+  const tmp = { obj: holder };
+  const plan = placeOnMat(tmp, k, true);
+  const p0 = plan.p0, end = plan.end;
+  await run(900, (p) => {
+    const e = ease(p);
+    holder.position.lerpVectors(p0, end, e);
+    holder.position.y += Math.sin(e * Math.PI) * 10;
+    holder.scale.setScalar(1 - 0.5 * e);
+    holder.rotation.x = 0;
+    const gp = grabPoint(holder);
+    tweezers.position.set(gp.x, gp.y - 0.4, gp.z);
+  });
+  await run(250, (p) => setTweezers(p));
+  const t0 = tweezers.position.clone();
+  await run(400, (p) => tweezers.position.y = t0.y + 20 * ease(p));
+  tweezers.visible = false;
+  // i pezzi restano sul tappetino
+  for (const it of objs) { scene.attach(it.obj); it.busy = false; }
+  scene.remove(holder);
+}
+async function lowerWithTweezers(objs) {
+  const lead = objs[0];
+  // posizione finale nel movimento
+  for (const it of objs) {
+    if (it.obj.parent !== mv) mv.add(it.obj);
+    it.obj.scale.set(1, 1, 1);
+    resetObj(it, it.obj);
+    it.obj.visible = true;
+    it.busy = true;
+    setOpacity(it.obj, 1);
+  }
+  mv.updateMatrixWorld(true);
+  const target = grabPoint(lead.obj);
+  const holder = new THREE.Group();
+  holder.userData.holder = true;
+  scene.add(holder);
+  holder.position.copy(target);
+  holder.updateMatrixWorld(true);
+  for (const it of objs) holder.attach(it.obj);
+  // partenza: dal tappetino (o dall'alto)
+  const startScale = 0.5;
+  const slot = matSlot(Math.max(0, matCount - 1));
+  const from = new THREE.Vector3(slot.x, slot.y + 3, slot.z);
+  holder.position.copy(from);
+  holder.scale.setScalar(startScale);
+  tweezers.visible = true;
+  setTweezers(0);
+  tweezers.rotation.set(0, 0.5, 0.12);
+  await run(1000, (p) => {
+    const e = ease(p);
+    holder.position.lerpVectors(from, target.clone().add(new THREE.Vector3(0, 10, 0)), e);
+    holder.position.y += Math.sin(e * Math.PI) * 10;
+    holder.scale.setScalar(startScale + (1 - startScale) * e);
+    tweezers.position.set(holder.position.x, holder.position.y - 0.4, holder.position.z);
+  });
+  const hy = holder.position.y;
+  await run(700, (p) => {
+    holder.position.y = hy + (target.y - hy) * ease(p);
+    tweezers.position.y = holder.position.y - 0.4;
+  });
+  await run(250, (p) => setTweezers(p));
+  const t0 = tweezers.position.clone();
+  await run(400, (p) => tweezers.position.y = t0.y + 20 * ease(p));
+  tweezers.visible = false;
+  for (const it of objs) { mv.attach(it.obj); resetObj(it, it.obj); it.obj.scale.set(1, 1, 1); it.busy = false; }
+  scene.remove(holder);
+  matCount = Math.max(0, matCount - 1);
+}
+async function oilAt(itemId, pts) {
+  const it = items[res(itemId)];
+  const h = it ? it.face : 7.4;
+  oiler.visible = true;
+  for (const pt of pts) {
+    const p = modelToWorld(pt[0], pt[1], it && it.dir < 0 ? h - 0.05 : h + 0.05);
+    oiler.userData.drop.visible = true;
+    oiler.position.copy(p).add(new THREE.Vector3(0, 16, 0));
+    await run(450, (q) => oiler.position.y = p.y + 16 * (1 - ease(q)) + 0.3);
+    await wait(250);
+    const bead = mesh(new THREE.SphereGeometry(0.45, 16, 12), MAT.oil(), false);
+    bead.scale.set(1, 0.45, 1);
+    bead.position.copy(p).add(new THREE.Vector3(0, 0.15, 0));
+    scene.add(bead);
+    beads.push(bead);
+    oiler.userData.drop.visible = false;
+    await run(350, (q) => oiler.position.y = p.y + 0.3 + 10 * ease(q));
+  }
+  await run(300, (q) => oiler.position.y += q * 2);
+  oiler.visible = false;
+}
+
+// ------------------------------------------------------------------ movimento vivo
+const live = { on: false, speed: 1, sound: false, panel: false, t: 0, clock0: 0, lastBeat: -1, demo: null };
+const LIVE_PARTS = ['bilanciere', 'spirale', 'ancora', 'ruota_scappamento', 'ruota_secondi', 'ruota_terzo', 'ruota_centro', 'bariletto'];
+const AMP = 4.6, WIN = 0.42, FORK = 0.16, FREQ = 4; // 28.800 alt/h
+function setLive(o) {
+  if (o.on !== undefined) live.on = !!o.on;
+  if (o.speed !== undefined) live.speed = Math.max(0.005, +o.speed);
+  if (o.panel !== undefined) live.panel = !!o.panel;
+  if (!live.clock0) {
+    const d = new Date();
+    live.clock0 = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000;
+  }
+  updatePanel();
+}
+function canRun() {
+  for (const id of LIVE_PARTS) {
+    const it = items[id];
+    if (!it || !it.obj.visible || it.obj.parent !== mv || it.busy) return false;
+  }
+  return true;
+}
+let lastPhase = '', lastPhaseSent = 0;
+function escState(t) {
+  const phase = TAU * FREQ * t / 2; // un'oscillazione completa = 2 alternanze
+  const theta = AMP * Math.sin(phase);
+  const u = phase / Math.PI;
+  const n = Math.floor(u + 0.5);
+  const d = (u - n) * Math.PI;
+  const w = Math.asin(Math.min(1, WIN / AMP));
+  const x = Math.min(1, Math.max(0, (d + w) / (2 * w)));
+  const steps = n - 0.5 + x * x * (3 - 2 * x);
+  const fork = FORK * Math.max(-1, Math.min(1, theta / WIN)) * -1;
+  let ph = 'libero';
+  if (Math.abs(d) < w) ph = d < -w * 0.15 ? 'sblocco' : 'impulso';
+  return { theta, steps, fork, ph, beat: n };
+}
+function applyLive(dt, now) {
+  if (!live.on) return;
+  live.t += dt * live.speed;
+  const running = canRun() || live.demo === 'escapement' || live.demo === 'energy';
+  if (!running) return;
+  const st = escState(live.t);
+  const escA = -st.steps * (TAU / 20) / 2;
+  const set = (id, a) => {
+    const it = items[id];
+    if (it && it.obj.parent === mv && !it.busy) it.obj.rotation.y = a;
+  };
+  set('bilanciere', st.theta);
+  const sp = items.spirale;
+  if (sp && sp.obj.parent === mv && !sp.busy) {
+    sp.obj.rotation.y = st.theta * 0.4;
+    const k = 1 + 0.035 * (st.theta / AMP);
+    sp.obj.scale.set(k, 1, k);
+  }
+  set('ancora', st.fork);
+  set('ruota_scappamento', escA);
+  set('ruota_secondi', -escA / 12);
+  set('ruota_terzo', escA / 90);
+  set('ruota_centro', -escA / 720);
+  set('bariletto', escA / 5760);
+  const ro = items.rotore;
+  if (ro && ro.obj.visible && ro.obj.parent === mv && !ro.busy && live.speed <= 1.5) ro.obj.rotation.y = 0.5 * Math.sin(live.t * 0.8);
+  const ha = items.lancette;
+  if (ha && ha.obj.parent === mv && live.demo !== 'keyless') {
+    const secs = live.clock0 + Math.floor(live.t * 8) / 8;
+    setHands(ha.obj, secs);
+  }
+  if (st.beat !== live.lastBeat) {
+    if (live.lastBeat >= 0 && live.sound && live.speed <= 2) tick(st.beat % 2);
+    live.lastBeat = st.beat;
+  }
+  if (live.demo === 'escapement' && st.ph !== lastPhase && now - lastPhaseSent > 90) {
+    lastPhase = st.ph;
+    lastPhaseSent = now;
+    send({ type: 'phase', phase: st.ph });
+  }
+}
+
+// suono del tic-tac (sintetizzato)
+let actx = null, noiseBuf = null;
+function ensureAudio() {
+  if (actx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  actx = new AC();
+  noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.03), actx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.0025));
+}
+function tick(alt) {
+  if (!actx) return;
+  const src = actx.createBufferSource();
+  src.buffer = noiseBuf;
+  const bp = actx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = alt ? 3600 : 4300;
+  bp.Q.value = 2.5;
+  const g = actx.createGain();
+  g.gain.value = 0.9;
+  src.connect(bp).connect(g).connect(actx.destination);
+  src.start();
+}
+
+// pannello comandi dentro la pagina (serve un tocco vero per l'audio)
+const panelEl = document.getElementById('live');
+function updatePanel() {
+  if (!panelEl) return;
+  panelEl.style.display = live.panel ? 'flex' : 'none';
+  const pb = document.getElementById('lp-play');
+  const sb = document.getElementById('lp-sound');
+  const vb = document.getElementById('lp-speed');
+  if (pb) pb.textContent = live.on ? '❚❚' : '▶';
+  if (sb) sb.textContent = live.sound ? '🔊' : '🔈';
+  if (vb) vb.textContent = live.speed >= 1 ? '1×' : (live.speed >= 0.1 ? '⅒' : '1/50');
+}
+if (panelEl) {
+  document.getElementById('lp-play').addEventListener('click', () => { setLive({ on: !live.on }); });
+  document.getElementById('lp-sound').addEventListener('click', () => {
+    ensureAudio();
+    if (actx && actx.state === 'suspended') actx.resume();
+    live.sound = !live.sound;
+    updatePanel();
+  });
+  document.getElementById('lp-speed').addEventListener('click', () => {
+    live.speed = live.speed >= 1 ? 0.1 : (live.speed >= 0.1 ? 0.02 : 1);
+    updatePanel();
+  });
+}
+
+
+// ------------------------------------------------------------------ "Come funziona" in 3D
+let demoTick = null;
+let flow = null; // particelle dell'energia
+let barrelDemo = null;
+const demoState = { pos: 0, posAnim: 0, turning: false, turnDir: 1, psi: 0, wrist: false, ticking: true, charge: 0.3, slip: 0, flash: 0, sentAt: 0 };
+
+function idsWithout(...skip) { return Object.keys(items).filter((id) => !skip.includes(id)); }
+
+function clearDemo() {
+  demoTick = null;
+  live.demo = null;
+  if (flow) { scene.remove(flow); flow = null; }
+  if (barrelDemo) barrelDemo.visible = false;
+  mv.visible = true;
+  for (const id of ['stelo', 'pignone_scorrevole', 'pignone_carica', 'tiretto', 'bascula', 'ruota_rinvio', 'ruota_minuteria', 'chaussee', 'ruota_ore', 'ruota_datario', 'disco_datario']) {
+    const it = items[id];
+    if (it) resetObj(it, it.obj);
+  }
+}
+
+function startDemo(cfg) {
+  clearDemo();
+  if (!cfg || !cfg.kind) { setLive({ on: false }); return; }
+  const k = cfg.kind;
+  live.demo = k;
+  if (k === 'escapement') {
+    const ids = ['platina', 'ruota_scappamento', 'ancora', 'bilanciere', 'spirale', 'ruota_secondi', 'ruota_terzo'];
+    applyState({ side: 'ponti', present: ids, focus: ['ruota_scappamento', 'ancora', 'bilanciere'], zoom: 0.8 });
+    setLive({ on: true, speed: cfg.speed ?? 0.05, panel: false });
+  } else if (k === 'energy') {
+    const ids = ['platina', 'bariletto', 'ruota_centro', 'ruota_terzo', 'ruota_secondi', 'ruota_scappamento', 'ancora', 'bilanciere', 'spirale'];
+    applyState({ side: 'ponti', present: ids, focus: ids.slice(1), zoom: 0.9 });
+    setLive({ on: true, speed: cfg.speed ?? 60, panel: false });
+    buildFlow();
+  } else if (k === 'keyless') {
+    const ids = ['platina', 'stelo', 'tiretto', 'pignone_carica', 'pignone_scorrevole', 'ruota_rinvio', 'bascula', 'chaussee', 'ruota_minuteria', 'ruota_ore', 'ruota_datario', 'lancette'];
+    applyState({ side: 'quadrante', present: ids, focus: ['stelo', 'tiretto', 'bascula', 'pignone_scorrevole', 'ruota_rinvio'], zoom: 0.8 });
+    setLive({ on: false, panel: false });
+    demoState.psi = 0;
+    demoTick = keylessTick;
+    demoKeyless(cfg);
+  } else if (k === 'bridle') {
+    setLive({ on: false, panel: false });
+    mv.visible = false;
+    tray.visible = false;
+    matGroup.visible = false;
+    buildBarrelDemo();
+    barrelDemo.visible = true;
+    demoTick = bridleTick;
+    const box = new THREE.Box3().setFromObject(barrelDemo);
+    const c = box.getCenter(new THREE.Vector3());
+    const t0 = controls.target.clone(), p0 = camera.position.clone();
+    const end = c.clone().add(new THREE.Vector3(0, 48, 30));
+    tween(800, (p) => { controls.target.lerpVectors(t0, c, ease(p)); camera.position.lerpVectors(p0, end, ease(p)); });
+  }
+}
+
+// --- energia: puntini luminosi lungo il percorso
+function buildFlow() {
+  const pts = [G.barrel, G.center, G.third, G.fourth, G.escape, G.pallet, G.balance].map((p, i) => new THREE.Vector3(X3(p[0]), 6.2 - i * 0.3, Z3(p[1])));
+  const curve = new THREE.CatmullRomCurve3(pts);
+  flow = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.95 });
+  const n = 26;
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 10), mat);
+    m.userData.u = i / n;
+    flow.add(m);
+  }
+  const line = new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 0.22, 6), new THREE.MeshBasicMaterial({ color: 0xf28c38, transparent: true, opacity: 0.45 }));
+  flow.add(line);
+  flow.userData.curve = curve;
+  scene.add(flow);
+  demoTick = (dt) => {
+    if (!flow) return;
+    for (const m of flow.children) {
+      if (m.userData.u === undefined) continue;
+      m.userData.u = (m.userData.u + dt * 0.12) % 1;
+      const p = flow.userData.curve.getPointAt(m.userData.u);
+      m.position.copy(p);
+      const s = 0.7 + 0.5 * Math.sin((m.userData.u * 12 + performance.now() / 300));
+      m.scale.setScalar(s);
+    }
+  };
+}
+
+// --- corona e remontoir
+function demoKeyless(cfg) {
+  if (cfg.pos !== undefined) demoState.pos = cfg.pos;
+  if (cfg.turning !== undefined) demoState.turning = !!cfg.turning;
+  if (cfg.dir !== undefined) demoState.turnDir = cfg.dir;
+}
+function keylessTick(dt) {
+  const ds = demoState;
+  ds.posAnim += (ds.pos - ds.posAnim) * Math.min(1, dt * 8);
+  const turn = ds.turning ? dt * 4 * ds.turnDir : 0;
+  ds.psi += turn;
+  const stem = items.stelo, clutch = items.pignone_scorrevole, wind = items.pignone_carica;
+  resetObj(stem, stem.obj);
+  stem.obj.position.x -= 1.5 * ds.posAnim;
+  stem.obj.rotation.x = ds.psi;
+  resetObj(clutch, clutch.obj);
+  const engageSetting = Math.min(1, ds.posAnim);
+  clutch.obj.position.x += -1.0 + 2.0 * engageSetting;
+  clutch.obj.rotation.x = ds.psi;
+  resetObj(wind, wind.obj);
+  if (ds.pos === 0) ds.windA = ds.psi;
+  wind.obj.rotation.x = ds.windA || 0;
+  const tir = items.tiretto, bas = items.bascula;
+  resetObj(tir, tir.obj); tir.obj.rotation.y = -0.1 * ds.posAnim;
+  resetObj(bas, bas.obj); bas.obj.rotation.y = 0.12 * engageSetting;
+  // messa all'ora
+  const st = demoState;
+  if (ds.pos === 2 && turn) {
+    st.setting = (st.setting || 0) + turn;
+  }
+  if (ds.pos === 1 && turn) {
+    st.date = (st.date || 0) + turn;
+  }
+  const setA = st.setting || 0;
+  const rw = items.ruota_rinvio; resetObj(rw, rw.obj); rw.obj.rotation.y = setA * 1.6;
+  const mw = items.ruota_minuteria; resetObj(mw, mw.obj); mw.obj.rotation.y = -setA * 0.9;
+  const cp = items.chaussee; resetObj(cp, cp.obj); cp.obj.rotation.y = setA * 0.4;
+  const hw = items.ruota_ore; resetObj(hw, hw.obj); hw.obj.rotation.y = setA * 0.4 / 12;
+  setHands(items.lancette.obj, 10 * 3600 + 10 * 60 + (setA * 0.4 / TAU) * 3600);
+  const dw = items.ruota_datario; resetObj(dw, dw.obj); dw.obj.rotation.y = (st.date || 0) * 1.2;
+  const dr = items.disco_datario; resetObj(dr, dr.obj);
+  const dstep = Math.floor(((st.date || 0) * 1.2) / Math.PI);
+  dr.obj.rotation.y = dstep * (TAU / 31);
+}
+
+// --- bariletto aperto e briglia
+function buildBarrelDemo() {
+  if (barrelDemo) return;
+  barrelDemo = new THREE.Group();
+  const R = 14;
+  const drum = mesh(extrude([gearRing(C0, 150, 96)], 0, 0.9, 0.08), MAT.gold());
+  barrelDemo.add(drum);
+  const floorG = mesh(cyl(R, 0.9, 1.3, 96), MAT.brass());
+  barrelDemo.add(floorG);
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 4.6, 96, 1, true), phys({ color: 0xd9ad58, metalness: 1, roughness: 0.3, side: THREE.DoubleSide }));
+  wall.position.y = 3.6;
+  wall.castShadow = true; wall.receiveShadow = true;
+  barrelDemo.add(wall);
+  const arbor = mesh(cyl(2.0, 0, 7.2, 32), MAT.steel());
+  barrelDemo.add(arbor);
+  const hook = mesh(new THREE.BoxGeometry(0.9, 2.0, 0.9), MAT.steel());
+  hook.position.set(2.2, 3.4, 0);
+  barrelDemo.add(hook);
+  const sq = mesh(new THREE.BoxGeometry(2.4, 1.2, 2.4), MAT.steel());
+  sq.position.y = 6.8;
+  barrelDemo.add(sq);
+  barrelDemo.userData.arbor = [arbor, hook, sq];
+  barrelDemo.position.set(0, 2, 0);
+  scene.add(barrelDemo);
+  rebuildSpring(0.3, 0);
+}
+let springMesh = null, bridleMesh = null;
+function rebuildSpring(charge, slip) {
+  const g = barrelDemo;
+  if (springMesh) { g.remove(springMesh); springMesh.geometry.dispose(); }
+  if (bridleMesh) { g.remove(bridleMesh); bridleMesh.geometry.dispose(); }
+  const turns = 7.5;
+  const ri = 8.5 - 5.8 * charge, ro = 13.0 - 5.6 * charge;
+  const start = slip - charge * 9;
+  const pts = [];
+  const N = 520;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, a = start + t * turns * TAU, r = ri + (ro - ri) * Math.pow(t, 0.9);
+    pts.push(new THREE.Vector3(Math.cos(a) * r, 3.5, Math.sin(a) * r));
+  }
+  // dall'albero alla prima spira
+  pts.unshift(new THREE.Vector3(Math.cos(start) * 2.4, 3.5, Math.sin(start) * 2.4));
+  const curve = new THREE.CatmullRomCurve3(pts);
+  springMesh = mesh(new THREE.TubeGeometry(curve, 900, 0.16, 6), phys({ color: 0xc9d1dc, metalness: 1, roughness: 0.18 }), false);
+  springMesh.scale.y = 1;
+  const flat = new THREE.Mesh(springMesh.geometry, springMesh.material);
+  void flat;
+  springMesh.geometry.scale(1, 1, 1);
+  g.add(springMesh);
+  // briglia: tratto finale premuto contro la parete
+  const endA = start + turns * TAU;
+  const bp = [];
+  for (let i = 0; i <= 40; i++) {
+    const a = endA + (i / 40) * 1.3;
+    bp.push(new THREE.Vector3(Math.cos(a) * 13.6, 3.5, Math.sin(a) * 13.6));
+  }
+  bridleMesh = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bp), 60, 0.32, 8), phys({ color: 0xf28c38, metalness: 0.6, roughness: 0.3, emissive: 0x401800 }), false);
+  g.add(bridleMesh);
+  for (const a of g.userData.arbor) a.rotation.y = -charge * 9;
+}
+let springDirty = 0;
+function bridleTick(dt, now) {
+  const ds = demoState;
+  const before = ds.charge;
+  if (ds.wrist) addCharge(dt * 0.12);
+  if (ds.ticking) ds.charge = Math.max(0, ds.charge - dt * 0.012);
+  ds.flash = Math.max(0, ds.flash - dt * 1.5);
+  if (bridleMesh) {
+    bridleMesh.material.emissive.setRGB(0.25 + 0.75 * ds.flash, 0.1 * (1 - ds.flash), 0);
+  }
+  springDirty += Math.abs(ds.charge - before) + (ds.slipping ? 1 : 0);
+  if (springDirty > 0.002) { rebuildSpring(ds.charge, ds.slip); springDirty = 0; }
+  ds.slipping = false;
+  if (now - ds.sentAt > 180) {
+    ds.sentAt = now;
+    send({ type: 'bridle', charge: ds.charge, flash: ds.flash });
+  }
+}
+function addCharge(v) {
+  const ds = demoState;
+  ds.charge += v;
+  if (ds.charge > 1) {
+    ds.slip += (ds.charge - 1) * 9;
+    ds.charge = 1;
+    ds.flash = 1;
+    ds.slipping = true;
+  }
+}
+
 // ------------------------------------------------------------------ ciclo
 const _v = new THREE.Vector3();
+let lastNow = 0;
 function loop(now) {
+  const dt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 0;
+  lastNow = now;
   for (let i = tweens.length - 1; i >= 0; i--) {
     const t = tweens[i];
     const p = Math.min(1, (now - t.t0) / t.dur);
@@ -1170,6 +1800,8 @@ function loop(now) {
     }
   }
   controls.update();
+  applyLive(dt, now);
+  if (demoTick) demoTick(dt, now);
   // evidenziazione pulsante
   const pulse = 0.35 + 0.3 * Math.sin(now / 260);
   for (const it of Object.values(items)) {
@@ -1234,7 +1866,7 @@ window.W3D = {
     } catch (e) { send({ type: 'error', msg: String(e && e.stack || e) }); }
   },
   show(st) {
-    try { applyState(st); } catch (e) { send({ type: 'error', msg: String(e && e.stack || e) }); }
+    try { if (live.demo) clearDemo(); applyState(st); } catch (e) { send({ type: 'error', msg: String(e && e.stack || e) }); }
   },
   play(action, seq) { play(action, seq); },
   focus(ids, zoom) { focusOn(ids, true, zoom); },
@@ -1242,9 +1874,28 @@ window.W3D = {
     xray = !!v;
     for (const it of Object.values(items)) setOpacity(it.obj, xray && it.cover ? 0.22 : 1);
   },
-  _i() { return { driver, screws, scene, camera, mv, arrow, items }; },
   _slow(k) { SPEED = k; },
-  _debug() { return { driver: driver.visible, dpos: driver.position.toArray(), tweens: tweens.length, arrow: arrow.visible, cam: camera.position.toArray(), tgt: controls.target.toArray() }; },
+  live(o) { setLive(o || {}); },
+  demo(cfg) {
+    try {
+      if (cfg && live.demo === cfg.kind) {
+        if (cfg.kind === 'keyless') demoKeyless(cfg);
+        if (cfg.kind === 'escapement' || cfg.kind === 'energy') setLive({ speed: cfg.speed ?? live.speed });
+        if (cfg.kind === 'bridle') {
+          if (cfg.wind) addCharge(cfg.wind);
+          if (cfg.wrist !== undefined) demoState.wrist = !!cfg.wrist;
+          if (cfg.ticking !== undefined) demoState.ticking = !!cfg.ticking;
+        }
+        return;
+      }
+      startDemo(cfg);
+    } catch (e) { send({ type: 'error', msg: String(e && e.stack || e) }); }
+  },
+  setQuality(q) {
+    try { localStorage.setItem('w3d_quality', q); } catch (e) { /* ignora */ }
+    location.reload();
+  },
+  quality() { return HQ ? 'high' : 'normal'; },
   view(name) {
     if (name === 'top') {
       const t0 = camera.position.clone();

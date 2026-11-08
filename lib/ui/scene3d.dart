@@ -14,11 +14,15 @@ import 'theme.dart';
 
 /// Ponte tra Flutter e il movimento 3D (three.js dentro una WebView).
 class Scene3DController {
-  Scene3DController({this.onTap, this.onDone, this.onNoGl});
+  Scene3DController({this.onTap, this.onDone, this.onNoGl, this.onReady});
 
   void Function(String partId)? onTap;
   void Function(int seq)? onDone;
   VoidCallback? onNoGl;
+  VoidCallback? onReady;
+  void Function(String phase)? onPhase;
+  void Function(double charge, double flash)? onBridle;
+  String? _lastDemo;
 
   bool ready = false;
   String? _lastShow;
@@ -40,12 +44,18 @@ class Scene3DController {
         ready = true;
         _js('W3D.setup(${jsonEncode({'screws': screwDefs.map((s) => s.toJson()).toList()})})');
         if (_lastShow != null) _js(_lastShow!);
+        if (_lastDemo != null) _js(_lastDemo!);
+        onReady?.call();
       case 'tap':
         final p = m['part'] as String?;
         if (p != null) onTap?.call(p);
       case 'done':
       case 'aborted':
         onDone?.call((m['seq'] as num?)?.toInt() ?? -1);
+      case 'phase':
+        onPhase?.call(m['phase'] as String? ?? '');
+      case 'bridle':
+        onBridle?.call((m['charge'] as num?)?.toDouble() ?? 0, (m['flash'] as num?)?.toDouble() ?? 0);
       case 'nogl':
         onNoGl?.call();
       case 'error':
@@ -68,6 +78,31 @@ class Scene3DController {
   }
 
   void view(String name) => _js("W3D.view('$name')");
+
+  /// Animazioni di "Come funziona". [start] = avvia una nuova animazione; altrimenti aggiorna i comandi.
+  void demo(Map<String, dynamic>? cfg, {bool start = false}) {
+    final c = 'W3D.demo(${jsonEncode(cfg)})';
+    if (start || cfg == null) _lastDemo = cfg == null ? null : c;
+    if (ready) _js(c);
+  }
+
+  void live(Map<String, dynamic> o) {
+    if (ready) _js('W3D.live(${jsonEncode(o)})');
+  }
+
+  void setQuality(bool high) {
+    ready = false;
+    _js("W3D.setQuality('${high ? 'high' : 'normal'}')");
+  }
+
+  Future<bool> isHighQuality() async {
+    try {
+      final r = await web.runJavaScriptReturningResult('W3D.quality()');
+      return r.toString().contains('high');
+    } catch (_) {
+      return true;
+    }
+  }
   void focus(List<String> ids) => _js('W3D.focus(${jsonEncode(ids)})');
 
   void _js(String code) {
@@ -192,6 +227,8 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
         return const ['rocchetto_cricco', 'cricchetto'];
       case ActionType.regulate:
         return const ['ponte_bilanciere'];
+      case ActionType.oil:
+        return a.ids;
     }
   }
 
@@ -202,6 +239,12 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
         if (a.type == ActionType.unscrew || a.type == ActionType.screw) ...a.ids,
     };
     final tray = involved.where((id) => !present.contains(id)).toList();
+    // pezzi sul tappetino: tolti in questo passo, oppure da rimettere
+    final moved = <String>{
+      for (final a in _actions)
+        if (a.type == ActionType.lift || a.type == ActionType.lower) ...a.ids,
+    };
+    final mat = moved.where((id) => !present.contains(id)).toList();
     final highlight = <String>{...?_op?.highlight};
     final numbered = <Map<String, dynamic>>[];
     if (k < _actions.length) {
@@ -224,6 +267,8 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
       'numbered': numbered,
       'tray': tray,
       'showTray': involved.isNotEmpty,
+      'mat': mat,
+      'live': {'panel': true},
       'focus': _focusFor(k),
       'xray': _xray,
       'animate': animate,
@@ -266,6 +311,7 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
         ActionType.press => 'Premi',
         ActionType.letdown => 'Scarica',
         ActionType.regulate => 'Regola',
+        ActionType.oil => 'Olia',
       };
 
   IconData _icon(ActionType t) => switch (t) {
@@ -276,6 +322,7 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
         ActionType.press => Icons.touch_app,
         ActionType.letdown => Icons.battery_alert,
         ActionType.regulate => Icons.tune,
+        ActionType.oil => Icons.water_drop_outlined,
       };
 
   @override
@@ -314,6 +361,7 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
                 ),
                 IconButton(tooltip: 'Vista dall\'alto', onPressed: () => c.view('top'), icon: const Icon(Icons.vertical_align_top)),
                 IconButton(tooltip: 'Tutto il movimento', onPressed: () => c.focus(const []), icon: const Icon(Icons.zoom_out_map)),
+                QualityMenu(controller: c),
               ],
             ),
           ),
@@ -460,6 +508,7 @@ class _Explore3DState extends State<Explore3D> {
       'present': present.toList(),
       'xray': widget.xray,
       'animate': true,
+      'live': {'on': widget.removed.isEmpty, 'panel': true},
       if (widget.removed.isEmpty) 'focus': const <String>[],
     };
   }
@@ -481,6 +530,25 @@ class _Explore3DState extends State<Explore3D> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: AspectRatio(aspectRatio: 1, child: Scene3DView(controller: c)),
+    );
+  }
+}
+
+/// Menu qualità grafica (alta / normale).
+class QualityMenu extends StatelessWidget {
+  final Scene3DController controller;
+  const QualityMenu({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<bool>(
+      tooltip: 'Qualità grafica',
+      icon: const Icon(Icons.high_quality_outlined),
+      onSelected: controller.setQuality,
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: true, child: Text('Qualità alta (più realistica)')),
+        PopupMenuItem(value: false, child: Text('Qualità normale (telefoni più lenti)')),
+      ],
     );
   }
 }
