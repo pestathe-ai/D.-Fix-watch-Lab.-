@@ -1,0 +1,1 @@
+{"name":"web3d","private":true,"version":"1.0.0","dependencies":{"esbuild":"^0.24.2","polygon-clipping":"^0.15.7","three":"^0.170.0"}}

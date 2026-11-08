@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/calibers.dart';
 import '../data/components.dart';
@@ -12,6 +13,7 @@ import '../logic/store.dart';
 import 'glossary_page.dart';
 import 'measure_page.dart';
 import 'how_it_works_page.dart';
+import 'scene3d.dart';
 import 'scene_widgets.dart';
 import 'step_timer.dart';
 import 'theme.dart';
@@ -35,10 +37,22 @@ class _GuidePageState extends State<GuidePage> {
   Revision get r => widget.revision;
   ServiceStep get s => _steps[_i];
 
+  bool _use3d = true;
+  bool _noGl = false;
+
   @override
   void initState() {
     super.initState();
     _notes.text = r.notes[s.id] ?? '';
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _use3d = p.getBool('view3d') ?? true);
+    });
+  }
+
+  Future<void> _toggle3d() async {
+    setState(() => _use3d = !_use3d);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('view3d', _use3d);
   }
 
   @override
@@ -214,6 +228,11 @@ class _GuidePageState extends State<GuidePage> {
       appBar: AppBar(
         title: Text(r.watchName, overflow: TextOverflow.ellipsis),
         actions: [
+          if (!_noGl)
+            TextButton(
+              onPressed: _toggle3d,
+              child: Text(_use3d ? '2D' : '3D', style: Brand.sora(14, 800, color: Brand.blu)),
+            ),
           IconButton(tooltip: 'Note sul calibro', onPressed: _showCaliberNotes, icon: const Icon(Icons.info_outline)),
           IconButton(tooltip: 'Tutti i passi', onPressed: _openSteps, icon: const Icon(Icons.format_list_numbered)),
         ],
@@ -253,12 +272,23 @@ class _GuidePageState extends State<GuidePage> {
             ),
           ],
           const SizedBox(height: 14),
-          StepScene(
-            steps: _steps,
-            index: _i,
-            automatic: r.caliber.type == WindType.automatic,
-            date: r.hasDate,
-          ),
+          if (_use3d && !_noGl)
+            StepScene3D(
+              steps: _steps,
+              index: _i,
+              automatic: r.caliber.type == WindType.automatic,
+              date: r.hasDate,
+              onNoGl: () {
+                if (mounted) setState(() => _noGl = true);
+              },
+            )
+          else
+            StepScene(
+              steps: _steps,
+              index: _i,
+              automatic: r.caliber.type == WindType.automatic,
+              date: r.hasDate,
+            ),
           const SizedBox(height: 12),
           Card(
             child: Padding(

@@ -9,3 +9,5 @@ ios/
 *.iml
 .metadata
 pubspec.lock
+web3d/node_modules/
+web3d/package-lock.json

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Movimento 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #eef0f4; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #c { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .lbl { position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 13px;
+    background: #1d3a8a; color: #fff; font: 800 13px/1 system-ui, sans-serif; display: none;
+    align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    border: 2px solid #fff; }
+  .lbl.on { background: #f28c38; transform-origin: center; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<script src="app.js"></script>
+</body>
+</html>

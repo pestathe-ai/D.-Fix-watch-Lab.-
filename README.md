@@ -2,6 +2,11 @@
 
 Guida passo passo alla revisione di orologi meccanici (automatici e a carica manuale), con la spiegazione di ogni pezzo.
 
+## Novità v0.3
+- **Movimento in 3D**: ruotalo con un dito, ingrandisci con due, ribaltalo tra lato ponti e lato quadrante.
+- **Vite per vite**: ogni passo è diviso in azioni (svita la vite 1 di 3, solleva il ponte...). Il cacciavite mostra il verso giusto, la vite finisce nel contenitore, e la vite a filetto sinistro è segnalata in rosso.
+- Interruttore 2D/3D in alto (il 2D resta come ripiego sui telefoni senza grafica 3D).
+
 ## Novità v0.2
 - **Esplora il movimento**: schema toccabile, lato ponti e lato quadrante, smontaggio a cursore e "raggi X".
 - **Passi illustrati**: ogni passo mostra il movimento nello stato giusto, anima i pezzi che togli o rimetti e indica i punti su cui agire.

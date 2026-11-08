@@ -7,6 +7,7 @@ import '../art/scene_steps.dart';
 import '../data/components.dart';
 import '../data/steps.dart';
 import 'glossary_page.dart';
+import 'scene3d.dart';
 import 'theme.dart';
 
 /// Scheda di un pezzo toccato nel disegno.
@@ -296,6 +297,8 @@ class _ExplorePageState extends State<ExplorePage> {
   bool _xray = false;
   double _k = 0;
   String? _selected;
+  bool _use3d = true;
+  bool _noGl = false;
 
   List<String> _order() {
     final out = <String>[];
@@ -325,7 +328,16 @@ class _ExplorePageState extends State<ExplorePage> {
     final lastName = last == null ? null : partById(last.partId)?.name;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Esplora il movimento')),
+      appBar: AppBar(
+        title: const Text('Esplora il movimento'),
+        actions: [
+          if (!_noGl)
+            TextButton(
+              onPressed: () => setState(() => _use3d = !_use3d),
+              child: Text(_use3d ? '2D' : '3D', style: Brand.sora(14, 800, color: Brand.blu)),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 28),
         children: [
@@ -353,17 +365,29 @@ class _ExplorePageState extends State<ExplorePage> {
             ),
           ]),
           const SizedBox(height: 6),
-          InteractiveViewer(
-            maxScale: 5,
-            panEnabled: false,
-            child: MovementCanvas(
-              painter: MovementPainter(side: _side, present: present, xray: _xray, selected: _selected),
-              onTapItem: (it) {
-                setState(() => _selected = it.id);
-                showPartSheet(context, it.partId);
+          if (_use3d && !_noGl)
+            Explore3D(
+              side: _side,
+              automatic: _auto,
+              date: _date,
+              xray: _xray,
+              removed: order.take(k).toList(),
+              onNoGl: () {
+                if (mounted) setState(() => _noGl = true);
               },
+            )
+          else
+            InteractiveViewer(
+              maxScale: 5,
+              panEnabled: false,
+              child: MovementCanvas(
+                painter: MovementPainter(side: _side, present: present, xray: _xray, selected: _selected),
+                onTapItem: (it) {
+                  setState(() => _selected = it.id);
+                  showPartSheet(context, it.partId);
+                },
+              ),
             ),
-          ),
           const SizedBox(height: 8),
           Text('Smonta', style: Brand.sora(15, 700, color: Brand.inchiostro)),
           Slider(

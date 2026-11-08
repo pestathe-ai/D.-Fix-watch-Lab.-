@@ -498,6 +498,21 @@ const List<WatchPart> parts = [
 
   // ---------- SUPPORTI ----------
   WatchPart(
+    id: 'viti',
+    name: 'Viti',
+    aka: 'screws',
+    group: 'Supporti',
+    whatItDoes: 'Tengono fermi ponti, placche e leve sulla platina.',
+    detail:
+        'Spesso sono azzurrate (blu) per resistere alla ruggine e per estetica. Nello stesso ponte '
+        'possono avere lunghezze diverse: per questo vanno tenute in ordine, ognuna vicino al suo pezzo. '
+        'Quasi tutte si svitano in senso antiorario; alcune (spesso la vite della ruota di carica) '
+        'hanno il filetto sinistro e si svitano in senso orario.',
+    careful:
+        'Cacciavite della larghezza esatta della fessura, perpendicolare e premuto bene: se scivola rovina la testa '
+        'e graffia il ponte. Stringi con decisione ma senza forzare.',
+  ),
+  WatchPart(
     id: 'platina',
     name: 'Platina',
     aka: 'main plate, piastra principale',
