@@ -24,8 +24,8 @@ const _roman = {
 };
 
 const _jewelWords = {
-  'SEVENTEEN': 17, 'NINETEEN': 19, 'TWENTYONE': 21, 'TWENTYTWO': 22, 'TWENTYTHREE': 23, 'TWENTYFOUR': 24,
-  'TWENTYFIVE': 25, 'TWENTYSIX': 26, 'TWENTYSEVEN': 27, 'TWENTYNINE': 29, 'THIRTYONE': 31, 'THIRTYFIVE': 35,
+  'FIFTEEN': 15, 'SEVENTEEN': 17, 'EIGHTEEN': 18, 'NINETEEN': 19, 'TWENTYONE': 21, 'TWENTYTWO': 22, 'TWENTYTHREE': 23, 'TWENTYFOUR': 24,
+  'TWENTYFIVE': 25, 'TWENTYSIX': 26, 'TWENTYSEVEN': 27, 'TWENTYNINE': 29, 'THIRTY': 30, 'THIRTYONE': 31, 'THIRTYFIVE': 35, 'SEIZE': 16, 'DIXSEPT': 17, 'DIXHUIT': 18, 'SIEBZEHN': 17,
 };
 
 /// Marche lette sul movimento: se manca il numero, propongo i loro calibri più comuni.
@@ -222,6 +222,9 @@ EngravingInfo matchEngravings(String rawText) {
       tokens.addAll(_variants(normEngraving(words[i] + words[i + 1])));
     }
   }
+  // i numeri di serie (6 o più cifre) non sono calibri: li tolgo, così non li scambio per un "7009…"
+  final engr = {for (final c in calibers) for (final e in c.engravings) normEngraving(e)};
+  tokens.removeWhere((t) => RegExp(r'^\d{6,}$').hasMatch(t) && !engr.contains(t));
   final joined = normEngraving(text);
 
   final guesses = <CaliberGuess>[];
@@ -235,7 +238,8 @@ EngravingInfo matchEngravings(String rawText) {
         final sc = eN.length >= 5 ? 1.0 : (eN.length == 4 ? 0.85 : 0.6);
         if (sc > best) best = sc;
         why.add('letto "$e"');
-      } else if (eN.length >= 4 && tokens.any((t) => t.startsWith(eN) && t.length <= eN.length + 2)) {
+      } else if (eN.length >= 4 &&
+          tokens.any((t) => t.startsWith(eN) && t.length <= eN.length + 2 && RegExp(r'^[A-Z]+$').hasMatch(t.substring(eN.length)))) {
         if (0.75 > best) best = 0.75;
         why.add('letto "$e…"');
       } else if (eN.length >= 5 && joined.contains(eN)) {
@@ -280,8 +284,7 @@ EngravingInfo matchEngravings(String rawText) {
   }
   // la marca letta: rafforza i suoi calibri e, se il numero manca, li propone
   for (final b in brandCalibers.entries) {
-    final seen = b.key.length <= 5 ? RegExp('\\b${b.key}\\b').hasMatch(text) : joined.contains(b.key);
-    if (!seen) continue;
+    if (!_brandSeen(b.key, text, joined)) continue;
     final ids = b.value.where((id) => calibers.any((c) => c.id == id)).toList();
     for (var i = 0; i < guesses.length; i++) {
       if (ids.contains(guesses[i].caliber.id)) {
@@ -309,8 +312,24 @@ EngravingInfo matchEngravings(String rawText) {
       }
     }
   }
+  // marca letta: i calibri di altre marche scendono (es. letto OMEGA → niente Seiko in cima)
+  final seenBrands = brandCalibers.keys.where((k) => _brandSeen(k, text, joined)).toList();
+  if (seenBrands.isNotEmpty) {
+    final ok = {for (final b in seenBrands) ...brandCalibers[b]!};
+    final known = {for (final v in brandCalibers.values) ...v};
+    for (var i = 0; i < guesses.length; i++) {
+      final g = guesses[i];
+      if (!ok.contains(g.caliber.id) && known.contains(g.caliber.id)) {
+        guesses[i] = CaliberGuess(g.caliber, (g.score - 0.3).clamp(0.05, 1.0),
+            [...g.why, 'ma la marca letta è ${_title(seenBrands.first)}'], source: g.source);
+      }
+    }
+  }
   guesses.sort((a, b) => b.score.compareTo(a.score));
   return EngravingInfo(guesses, jewels, automatic, rawText);
 }
 
 String _title(String b) => _brandNames[b] ?? (b.length <= 3 ? b : b[0] + b.substring(1).toLowerCase());
+
+bool _brandSeen(String key, String text, String joined) =>
+    key.length <= 5 ? RegExp('\\b$key\\b').hasMatch(text) : joined.contains(key);

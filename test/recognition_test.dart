@@ -116,6 +116,16 @@ void main() {
       expect(matchEngravings('TISSOT SWISS POWERMATIC 80').guesses.first.caliber.id, 'powermatic80');
       expect(matchEngravings('SLAVA 2427').guesses.first.caliber.id, 'slava2427');
     });
+    test('Speedmaster 1861 dalla foto vera: marca + rubini, il numero di serie non conta', () {
+      // testo come lo legge l'OCR dalla foto dell'utente (ponte con OMEGA, EIGHTEEN 18 JEWELS, seriale in basso)
+      final info = matchEngravings('SWISS\nOMEGA\nEIGHTEEN\n18\nJEWELS\n77009123');
+      expect(info.jewels, 18);
+      expect(info.guesses.first.caliber.id, 'omega1861');
+      expect(info.guesses.any((g) => g.caliber.id == 'seiko6309' && g.score > 0.3), isFalse);
+      final solo = matchEngravings('OMEGA SWISS EIGHTEEN JEWELS 7700912');
+      expect(solo.jewels, 18);
+      expect(solo.guesses.first.caliber.id, 'omega1861');
+    });
     test('Omega vintage, Zenith, Bulova, Mondia', () {
       expect(matchEngravings('OMEGA 565 24 JEWELS').guesses.first.caliber.id, 'omega56x');
       expect(matchEngravings('OMEGA WATCH CO 620').guesses.first.caliber.id, 'omega601');

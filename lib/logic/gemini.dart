@@ -104,7 +104,7 @@ class Gemini {
   /// Manda la richiesta; se il modello non esiste più ne sceglie un altro da solo e riprova.
   static Future<(int, String, String)> post(AiSettings s, String body) async {
     var model = s.model;
-    for (var attempt = 0; attempt < 2; attempt++) {
+    for (var attempt = 0; attempt < 3; attempt++) {
       final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
       try {
         final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
@@ -114,6 +114,12 @@ class Gemini {
         req.add(utf8.encode(body));
         final res = await req.close().timeout(const Duration(seconds: 90));
         final txt = await res.transform(utf8.decoder).join();
+        // sovraccarico: aspetto un attimo e riprovo, poi passo al modello più leggero
+        if ((res.statusCode == 503 || res.statusCode == 500) && attempt < 2) {
+          await Future<void>.delayed(Duration(seconds: 2 + attempt * 3));
+          if (attempt == 1) model = 'gemini-flash-lite-latest';
+          continue;
+        }
         if (res.statusCode == 404 && attempt == 0) {
           final other = await discoverGeminiModel(s.key);
           if (other != null && other != model) {
@@ -156,6 +162,10 @@ class Gemini {
       }
       if (res.statusCode == 404) {
         throw AiException('Il modello "$model" non risponde e non ne ho trovato un altro: riprova più tardi.');
+      }
+      if (res.statusCode == 503 || res.statusCode == 500) {
+        throw const AiException('Gemini è sovraccarico in questo momento (succede spesso col piano gratuito). '
+            'Ho usato il riconoscimento offline: riprova tra qualche minuto per il parere dell\'AI.');
       }
       if (res.statusCode != 200) throw AiException('Errore di Gemini (${res.statusCode}).');
       return parseGeminiJson(txt);
