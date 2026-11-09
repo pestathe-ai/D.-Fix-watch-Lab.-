@@ -39,6 +39,7 @@ class _GuidePageState extends State<GuidePage> {
   ServiceStep get s => _steps[_i];
 
   bool _use3d = true;
+  bool _prefsReady = false;
   bool _noGl = false;
 
   @override
@@ -46,7 +47,12 @@ class _GuidePageState extends State<GuidePage> {
     super.initState();
     _notes.text = r.notes[s.id] ?? '';
     SharedPreferences.getInstance().then((p) {
-      if (mounted) setState(() => _use3d = p.getBool('view3d') ?? true);
+      if (mounted) {
+        setState(() {
+          _use3d = p.getBool('view3d') ?? true;
+          _prefsReady = true;
+        });
+      }
     });
   }
 
@@ -467,6 +473,7 @@ class _GuidePageState extends State<GuidePage> {
   }
 
   Widget _scene() {
+    if (!_prefsReady) return const AspectRatio(aspectRatio: 1, child: Center(child: CircularProgressIndicator()));
     if (_use3d && !_noGl) {
       return StepScene3D(
         steps: _steps,
