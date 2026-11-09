@@ -38,4 +38,18 @@ void main() {
   test('nessun modello utile: null', () {
     expect(pickGeminiModel({'models': [_m('gemini-embedding-2', ['embedContent'])]}), isNull);
   });
+
+  test('ragionamento lungo: spento di base, attesa breve', () {
+    const fast = AiSettings('k', 'gemini-flash-latest');
+    const deep = AiSettings('k', 'gemini-flash-latest', deep: true);
+    expect(fast.deep, isFalse);
+    expect(fast.timeout.inSeconds, lessThanOrEqualTo(30));
+    expect(deep.timeout.inSeconds, greaterThan(fast.timeout.inSeconds));
+  });
+
+  test('ogni errore dell\'AI ha un motivo', () {
+    const e = AiException('sovraccarico', kind: AiFail.busy);
+    expect(e.kind, AiFail.busy);
+    expect(const AiException('x').kind, AiFail.other);
+  });
 }

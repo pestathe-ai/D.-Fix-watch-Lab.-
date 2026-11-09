@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'dart:isolate';
+
+import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/calibers.dart';
@@ -11,6 +15,7 @@ import 'screw_detector.dart';
 class AiSettings {
   static const _kKey = 'gemini_key';
   static const _kModel = 'gemini_model';
+  static const _kDeep = 'gemini_deep';
   /// Alias di Google che punta sempre all'ultimo Flash: non "scade" quando escono modelli nuovi.
   static const defaultModel = 'gemini-flash-latest';
 
@@ -20,7 +25,12 @@ class AiSettings {
 
   final String key;
   final String model;
-  const AiSettings(this.key, this.model);
+  /// Ragionamento lungo: più preciso ma molto più lento. Spento di base.
+  final bool deep;
+  const AiSettings(this.key, this.model, {this.deep = false});
+
+  /// Quanto aspetto la risposta prima di arrendermi.
+  Duration get timeout => deep ? const Duration(seconds: 60) : const Duration(seconds: 25);
 
   bool get enabled => key.trim().isNotEmpty;
 
@@ -28,7 +38,12 @@ class AiSettings {
     final p = await SharedPreferences.getInstance();
     var m = p.getString(_kModel) ?? defaultModel;
     if (m.trim().isEmpty || isRetired(m.trim())) m = defaultModel;
-    return AiSettings(p.getString(_kKey) ?? '', m.trim());
+    return AiSettings(p.getString(_kKey) ?? '', m.trim(), deep: p.getBool(_kDeep) ?? false);
+  }
+
+  static Future<void> setDeep(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kDeep, v);
   }
 
   static Future<void> save(String key, String model) async {
@@ -83,9 +98,13 @@ String? pickGeminiModel(Map<String, dynamic> list) {
   return names.isEmpty ? null : names.first;
 }
 
+/// Perché l'AI non è stata usata.
+enum AiFail { busy, quota, key, offline, slow, other }
+
 class AiException implements Exception {
   final String message;
-  const AiException(this.message);
+  final AiFail kind;
+  const AiException(this.message, {this.kind = AiFail.other});
   @override
   String toString() => message;
 }
@@ -101,23 +120,31 @@ class Gemini {
   final AiSettings s;
   const Gemini(this.s);
 
-  /// Manda la richiesta; se il modello non esiste più ne sceglie un altro da solo e riprova.
-  static Future<(int, String, String)> post(AiSettings s, String body) async {
+  /// Manda la richiesta. Se il modello non esiste più ne sceglie un altro da solo;
+  /// se Google è sovraccarico riprova una volta sola col modello leggero.
+  static Future<(int, String, String)> post(AiSettings s, String body, {Duration? timeout}) async {
     var model = s.model;
+    var payload = body;
     for (var attempt = 0; attempt < 3; attempt++) {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
       try {
         final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
         final req = await client.postUrl(uri);
         req.headers.contentType = ContentType.json;
         req.headers.set('x-goog-api-key', s.key);
-        req.add(utf8.encode(body));
-        final res = await req.close().timeout(const Duration(seconds: 90));
+        req.add(utf8.encode(payload));
+        final res = await req.close().timeout(timeout ?? s.timeout);
         final txt = await res.transform(utf8.decoder).join();
-        // sovraccarico: aspetto un attimo e riprovo, poi passo al modello più leggero
-        if ((res.statusCode == 503 || res.statusCode == 500) && attempt < 2) {
-          await Future<void>.delayed(Duration(seconds: 2 + attempt * 3));
-          if (attempt == 1) model = 'gemini-flash-lite-latest';
+        if ((res.statusCode == 503 || res.statusCode == 500) && attempt == 0) {
+          await Future<void>.delayed(const Duration(seconds: 2));
+          model = 'gemini-flash-lite-latest';
+          continue;
+        }
+        // un modello che non accetta il livello di ragionamento: riprovo senza
+        if (res.statusCode == 400 && txt.toLowerCase().contains('thinking') && payload.contains('thinkingConfig')) {
+          final j = jsonDecode(payload) as Map<String, dynamic>;
+          (j['generationConfig'] as Map).remove('thinkingConfig');
+          payload = jsonEncode(j);
           continue;
         }
         if (res.statusCode == 404 && attempt == 0) {
@@ -130,14 +157,27 @@ class Gemini {
         }
         return (res.statusCode, txt, model);
       } finally {
-        client.close();
+        client.close(force: true);
       }
     }
-    return (404, '', model);
+    return (503, '', model);
   }
 
+  /// Foto più leggera per l'AI: 1280 px bastano per leggere le incisioni e si carica in un attimo.
+  static Future<List<int>> smallJpeg(String path) => Isolate.run(() {
+        final bytes = File(path).readAsBytesSync();
+        final src = img.decodeImage(bytes);
+        if (src == null) return bytes;
+        var im = img.bakeOrientation(src);
+        final long = im.width > im.height ? im.width : im.height;
+        if (long > 1280) {
+          im = im.width >= im.height ? img.copyResize(im, width: 1280) : img.copyResize(im, height: 1280);
+        }
+        return img.encodeJpg(im, quality: 82);
+      });
+
   Future<Map<String, dynamic>> _ask(String imagePath, String prompt) async {
-    final bytes = await File(imagePath).readAsBytes();
+    final bytes = await smallJpeg(imagePath);
     final body = jsonEncode({
       'contents': [
         {
@@ -149,28 +189,37 @@ class Gemini {
           ],
         },
       ],
-      'generationConfig': {'response_mime_type': 'application/json', 'temperature': 0.2},
+      'generationConfig': {
+        'response_mime_type': 'application/json',
+        'temperature': 0.2,
+        'thinkingConfig': {'thinkingLevel': s.deep ? 'high' : 'low'},
+      },
     });
     try {
       final (code, txt, model) = await post(s, body);
       final res = (statusCode: code);
       if (res.statusCode == 429) {
-        throw const AiException('Limite gratuito di Gemini raggiunto per ora. Riprova tra qualche minuto (intanto uso il riconoscimento offline).');
+        throw const AiException('Hai raggiunto il limite gratuito di Gemini per ora: riprova tra qualche minuto.', kind: AiFail.quota);
       }
       if (res.statusCode == 400 || res.statusCode == 401 || res.statusCode == 403) {
-        throw AiException('Gemini ha rifiutato la richiesta (codice ${res.statusCode}): controlla la chiave e il nome del modello nelle impostazioni.');
+        throw AiException('Gemini ha rifiutato la richiesta (codice ${res.statusCode}): controlla la chiave nelle impostazioni.',
+            kind: AiFail.key);
       }
       if (res.statusCode == 404) {
         throw AiException('Il modello "$model" non risponde e non ne ho trovato un altro: riprova più tardi.');
       }
       if (res.statusCode == 503 || res.statusCode == 500) {
-        throw const AiException('Gemini è sovraccarico in questo momento (succede spesso col piano gratuito). '
-            'Ho usato il riconoscimento offline: riprova tra qualche minuto per il parere dell\'AI.');
+        throw const AiException('I server di Google sono sovraccarichi in questo momento (capita spesso col piano gratuito).',
+            kind: AiFail.busy);
       }
       if (res.statusCode != 200) throw AiException('Errore di Gemini (${res.statusCode}).');
       return parseGeminiJson(txt);
     } on SocketException {
-      throw const AiException('Niente connessione a internet: uso il riconoscimento offline.');
+      throw const AiException('Niente connessione a internet.', kind: AiFail.offline);
+    } on TimeoutException {
+      throw AiException('Gemini non ha risposto entro ${s.timeout.inSeconds} secondi.', kind: AiFail.slow);
+    } on HttpException {
+      throw const AiException('Connessione con Gemini interrotta.', kind: AiFail.offline);
     }
   }
 

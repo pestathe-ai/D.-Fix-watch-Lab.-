@@ -17,6 +17,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   final _key = TextEditingController();
   final _model = TextEditingController();
   bool _show = false;
+  bool _deep = false;
   bool _testing = false;
   String? _result;
   bool _ok = false;
@@ -29,6 +30,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       setState(() {
         _key.text = s.key;
         _model.text = s.model;
+        _deep = s.deep;
       });
     });
   }
@@ -132,6 +134,20 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             ),
           ),
           const SizedBox(height: 10),
+          Card(
+            child: SwitchListTile(
+              value: _deep,
+              onChanged: (v) {
+                setState(() => _deep = v);
+                AiSettings.setDeep(v);
+              },
+              title: const Text('Ragionamento lungo'),
+              subtitle: Text(_deep
+                  ? 'Acceso: l\'AI ci pensa di più. Un po\' più precisa sui movimenti difficili, ma può metterci 20–60 secondi.'
+                  : 'Spento: risposta in pochi secondi. Accendilo se l\'AI sbaglia spesso il calibro.'),
+            ),
+          ),
+          const SizedBox(height: 8),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             title: const Text('Avanzate: modello', style: TextStyle(fontSize: 15)),

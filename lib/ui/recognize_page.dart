@@ -29,8 +29,17 @@ class _RecognizePageState extends State<RecognizePage> {
   String? _ocrText;
   List<CaliberGuess> _guesses = [];
   int? _jewels;
-  String? _aiNote;
+  String? _aiNote; // errore della lettura offline
   bool _aiOn = false;
+
+  // stato dell'AI, sempre visibile sopra i risultati
+  _Ai _ai = _Ai.off;
+  String? _aiWhy; // perché non è stata usata
+  String? _aiSaid; // cosa ha detto
+  int _run = 0; // per ignorare risposte di foto vecchie
+  List<CaliberGuess> _offline = [];
+  List<CaliberGuess> _aiGuesses = [];
+  final _clock = Stopwatch();
   final _code = TextEditingController();
 
   @override
@@ -58,27 +67,46 @@ class _RecognizePageState extends State<RecognizePage> {
   Future<void> _shoot(ImageSource src) async {
     final x = await ImagePicker().pickImage(source: src, maxWidth: 2400, imageQuality: 92);
     if (x == null) return;
+    final run = ++_run;
+    _clock
+      ..reset()
+      ..start();
     setState(() {
       _photo = x.path;
       _busy = true;
       _status = 'Leggo le scritte incise sul movimento…';
       _guesses = [];
+      _offline = [];
+      _aiGuesses = [];
       _ocrText = null;
       _aiNote = null;
       _jewels = null;
+      _aiSaid = null;
+      _aiWhy = null;
     });
-    final merged = <String, CaliberGuess>{};
+    // l'AI parte subito, in parallelo alla lettura offline
+    final settings = await AiSettings.load();
+    _aiOn = settings.enabled;
+    if (settings.enabled) {
+      _askAi(x.path, run, settings);
+    } else {
+      _ai = _Ai.off;
+    }
+    await _readOffline(x.path, run);
+  }
+
+  Future<void> _readOffline(String path, int run) async {
     try {
       final rec = TextRecognizer(script: TextRecognitionScript.latin);
       final texts = <String>[];
-      final first = await rec.processImage(InputImage.fromFilePath(x.path));
+      final first = await rec.processImage(InputImage.fromFilePath(path));
       texts.add(first.text);
       // se non basta, rileggo la foto ruotata e con più contrasto
       if (matchEngravings(first.text).guesses.every((g) => g.score < 0.8)) {
-        if (mounted) setState(() => _status = 'Rileggo la foto da altre angolazioni…');
+        if (mounted && run == _run) setState(() => _status = 'Rileggo la foto girata e con più contrasto…');
         try {
           final dir = (await getTemporaryDirectory()).path;
-          for (final v in await ocrVariants(x.path, dir)) {
+          for (final v in await ocrVariants(path, dir)) {
             final r = await rec.processImage(InputImage.fromFilePath(v));
             if (r.text.trim().isNotEmpty) texts.add(r.text);
             if (matchEngravings(texts.join('\n')).guesses.any((g) => g.score >= 0.85)) break;
@@ -88,47 +116,149 @@ class _RecognizePageState extends State<RecognizePage> {
         }
       }
       await rec.close();
-      final all = texts.join('\n');
-      final info = matchEngravings(all);
+      final info = matchEngravings(texts.join('\n'));
       _ocrText = texts.map((t) => t.trim()).where((t) => t.isNotEmpty).toSet().join('\n—\n');
       _jewels = info.jewels;
-      for (final g in info.guesses) {
-        merged[g.caliber.id] = g;
-      }
+      _offline = info.guesses;
     } catch (e) {
-      _ocrText = null;
       debugPrint('OCR: $e');
+      _ocrText = null;
       _aiNote = 'Non sono riuscito a leggere le scritte su questa foto. Riprova con più luce, '
           'oppure rispondi a qualche domanda qui sotto.';
     }
-    final ai = await AiSettings.load();
-    if (ai.enabled) {
-      if (mounted) setState(() => _status = 'Chiedo all\'AI di riconoscere il movimento…');
-      try {
-        for (final g in await Gemini(ai).identify(x.path)) {
-          final old = merged[g.caliber.id];
-          if (old == null) {
-            merged[g.caliber.id] = g;
-          } else {
-            merged[g.caliber.id] = CaliberGuess(
-              g.caliber,
-              (old.score + g.score) / 2 + 0.15 > 1 ? 1 : (old.score + g.score) / 2 + 0.15,
-              [...old.why, ...g.why],
-              source: 'scritte + AI',
-            );
-          }
-        }
-      } on AiException catch (e) {
-        _aiNote = e.message;
-      }
-    }
-    final list = merged.values.toList()..sort((a, b) => b.score.compareTo(a.score));
-    if (mounted) {
+    if (!mounted || run != _run) return;
+    setState(() {
+      _busy = false;
+      _merge();
+    });
+  }
+
+  Future<void> _askAi(String path, int run, AiSettings settings) async {
+    setState(() => _ai = _Ai.running);
+    try {
+      final g = await Gemini(settings).identify(path);
+      if (!mounted || run != _run || _ai == _Ai.skipped) return;
       setState(() {
-        _guesses = list;
-        _busy = false;
+        _aiGuesses = g;
+        _aiSaid = g.isEmpty ? null : g.first.caliber.name;
+        _ai = _Ai.ok;
+        _merge();
+      });
+    } on AiException catch (e) {
+      if (!mounted || run != _run || _ai == _Ai.skipped) return;
+      setState(() {
+        _ai = _Ai.failed;
+        _aiWhy = e.message;
+      });
+    } catch (e) {
+      if (!mounted || run != _run || _ai == _Ai.skipped) return;
+      setState(() {
+        _ai = _Ai.failed;
+        _aiWhy = 'Errore imprevisto ($e).';
       });
     }
+  }
+
+  void _retryAi() async {
+    if (_photo == null || _photo!.isEmpty) return;
+    final s = await AiSettings.load();
+    if (!s.enabled) return;
+    _aiGuesses = [];
+    _askAi(_photo!, _run, s);
+  }
+
+  /// Unisce scritte e AI: se dicono la stessa cosa, la fiducia sale.
+  void _merge() {
+    final m = <String, CaliberGuess>{for (final g in _offline) g.caliber.id: g};
+    for (final g in _aiGuesses) {
+      final old = m[g.caliber.id];
+      m[g.caliber.id] = old == null
+          ? g
+          : CaliberGuess(g.caliber, ((old.score + g.score) / 2 + 0.15).clamp(0.0, 1.0), [...old.why, ...g.why],
+              source: 'scritte + AI');
+    }
+    _guesses = m.values.toList()..sort((a, b) => b.score.compareTo(a.score));
+  }
+
+  Widget _aiBanner() {
+    final (IconData icon, Color color, String title, String text) = switch (_ai) {
+      _Ai.running => (
+          Icons.auto_awesome,
+          Brand.blu,
+          'L\'AI sta ancora controllando…',
+          'Intanto ecco cosa ho letto dalle scritte. La lista si aggiorna da sola quando risponde.'
+        ),
+      _Ai.ok => (
+          Icons.check_circle,
+          Colors.green.shade700,
+          'Controllato anche con l\'AI',
+          _aiSaid == null ? 'Gemini non ha riconosciuto un calibro preciso.' : 'Gemini dice: $_aiSaid.'
+        ),
+      _Ai.failed => (
+          Icons.warning_amber_rounded,
+          Colors.orange.shade800,
+          'AI non usata: risultati solo dalle scritte',
+          _aiWhy ?? ''
+        ),
+      _Ai.skipped => (
+          Icons.do_not_disturb_on_outlined,
+          Colors.orange.shade800,
+          'AI saltata: risultati solo dalle scritte',
+          'Non hai aspettato la risposta di Gemini.'
+        ),
+      _Ai.off => (
+          Icons.cloud_off,
+          Colors.grey.shade700,
+          'AI spenta: risultati solo dalle scritte',
+          'Puoi attivare l\'AI gratuita: legge anche la forma dei ponti, non solo le scritte.'
+        ),
+    };
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          if (_ai == _Ai.running)
+            SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: color))
+          else
+            Icon(icon, color: color, size: 24),
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: Brand.sora(15.5, 800, color: color))),
+        ]),
+        if (text.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(text, style: const TextStyle(fontSize: 15, height: 1.35)),
+        ],
+        Wrap(spacing: 4, children: [
+          if (_ai == _Ai.running)
+            TextButton(
+              onPressed: () => setState(() => _ai = _Ai.skipped),
+              child: const Text('Non aspettare'),
+            ),
+          if (_ai == _Ai.failed || _ai == _Ai.skipped)
+            TextButton.icon(
+              onPressed: _retryAi,
+              icon: const Icon(Icons.refresh, size: 20),
+              label: const Text('Riprova con l\'AI'),
+            ),
+          if (_ai == _Ai.off)
+            TextButton.icon(
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const AiSettingsPage()));
+                final s = await AiSettings.load();
+                if (mounted) setState(() => _aiOn = s.enabled);
+                if (s.enabled) _retryAi();
+              },
+              icon: const Icon(Icons.auto_awesome, size: 20),
+              label: const Text('Attiva l\'AI'),
+            ),
+        ]),
+      ]),
+    );
   }
 
   @override
@@ -175,6 +305,10 @@ class _RecognizePageState extends State<RecognizePage> {
                 label: const Text('Galleria'),
               ),
             ]),
+          if (!_busy && _photo != null && _photo!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _aiBanner(),
+          ],
           if (!_busy && _photo != null) ...[
             const SizedBox(height: 18),
             Text(_guesses.isEmpty ? 'Non l\'ho riconosciuto' : 'Potrebbe essere',
@@ -190,7 +324,8 @@ class _RecognizePageState extends State<RecognizePage> {
                     isThreeLine: true,
                     trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Text('${(g.score * 100).round()}%', style: Brand.sora(15, 800, color: Brand.arancio)),
-                      Text(g.source, style: const TextStyle(fontSize: 11)),
+                      Text(g.source == 'AI' ? 'dall\'AI' : g.source == 'scritte' ? 'dalle scritte' : g.source,
+                          style: const TextStyle(fontSize: 11.5)),
                     ]),
                     onTap: () => Navigator.pop(context, g.caliber),
                   ),
@@ -244,7 +379,7 @@ class _RecognizePageState extends State<RecognizePage> {
               ),
             ],
           ],
-          if (!_aiOn) ...[
+          if (!_aiOn && _photo == null) ...[
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: () async {
@@ -261,3 +396,5 @@ class _RecognizePageState extends State<RecognizePage> {
     );
   }
 }
+
+enum _Ai { off, running, ok, failed, skipped }

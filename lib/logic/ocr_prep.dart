@@ -11,8 +11,8 @@ Future<List<String>> ocrVariants(String path, String outDir) {
     if (src == null) return <String>[];
     var im = img.bakeOrientation(src);
     final long = im.width > im.height ? im.width : im.height;
-    if (long > 1800) {
-      im = im.width >= im.height ? img.copyResize(im, width: 1800) : img.copyResize(im, height: 1800);
+    if (long > 1400) {
+      im = im.width >= im.height ? img.copyResize(im, width: 1400) : img.copyResize(im, height: 1400);
     }
     // grigio + contrasto: le incisioni risaltano sul metallo
     final g = img.grayscale(img.Image.from(im));
@@ -21,7 +21,7 @@ Future<List<String>> ocrVariants(String path, String outDir) {
     final out = <String>[];
     void save(img.Image x, String name) {
       final f = '$outDir/ocr_$name.jpg';
-      File(f).writeAsBytesSync(img.encodeJpg(x, quality: 90));
+      File(f).writeAsBytesSync(img.encodeJpg(x, quality: 85));
       out.add(f);
     }
 
@@ -29,8 +29,6 @@ Future<List<String>> ocrVariants(String path, String outDir) {
     save(img.copyRotate(sharp, angle: 90), 'c90');
     save(img.copyRotate(sharp, angle: 180), 'c180');
     save(img.copyRotate(sharp, angle: 270), 'c270');
-    save(img.copyRotate(im, angle: 45), 'r45');
-    save(img.copyRotate(im, angle: -45), 'r315');
     return out;
   });
 }
