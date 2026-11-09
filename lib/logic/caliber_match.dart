@@ -23,6 +23,40 @@ const _roman = {
   'XXIII': 23, 'XXIV': 24, 'XXV': 25, 'XXVI': 26, 'XXVII': 27, 'XXVIII': 28, 'XXIX': 29, 'XXX': 30,
 };
 
+const _jewelWords = {
+  'SEVENTEEN': 17, 'NINETEEN': 19, 'TWENTYONE': 21, 'TWENTYTWO': 22, 'TWENTYTHREE': 23, 'TWENTYFOUR': 24,
+  'TWENTYFIVE': 25, 'TWENTYSIX': 26, 'TWENTYSEVEN': 27, 'TWENTYNINE': 29, 'THIRTYONE': 31, 'THIRTYFIVE': 35,
+};
+
+/// Marche lette sul movimento: se manca il numero, propongo i loro calibri più comuni.
+const brandCalibers = {
+  'ROLEX': ['rolex3135', 'rolex3235', 'rolex3130', 'rolex3230', 'rolex3035', 'rolex1570', 'rolex2235', 'rolex4130'],
+  'OMEGA': ['omega8500', 'omega8800', 'omega1861', 'omega2500', 'omega1120', 'omega321'],
+  'SEIKO': ['nh35', 'nh36', 'seiko6r35', 'seiko6r15', 'seiko7s26', 'seiko6309', 'seiko8l35', 'nh34'],
+  'GRANDSEIKO': ['seiko9s'],
+  'TISSOT': ['powermatic80', 'eta2824', 'eta2836'],
+  'HAMILTON': ['powermatic80', 'eta2824', 'eta6497'],
+  'MIDO': ['powermatic80'],
+  'CERTINA': ['powermatic80'],
+  'LONGINES': ['longinesl888', 'eta2892'],
+  'ETA': ['eta2824', 'eta2836', 'eta2892', 'eta6497', 'eta7001', 'powermatic80'],
+  'SELLITA': ['sw200', 'sw220', 'sw300', 'sw330', 'valjoux7750'],
+  'MIYOTA': ['miyota8215', 'miyota9015', 'miyota8205', 'miyota8315', 'miyota82s'],
+  'CITIZEN': ['miyota8215', 'miyota9015', 'miyota8205'],
+  'ORIENT': ['orientf6922', 'orient46943'],
+  'VOSTOK': ['vostok2416'],
+  'POLJOT': ['poljot3133'],
+  'SEAGULL': ['st36', 'st2130', 'st1901'],
+  'TIANJIN': ['st36', 'st2130', 'st1901'],
+  'UNITAS': ['eta6497'],
+  'VALJOUX': ['valjoux7750'],
+  'ZENITH': ['zenith400'],
+  'BREITLING': ['breitlingb01', 'valjoux7750', 'eta2824'],
+  'TUDOR': ['eta2824', 'eta2892'],
+  'PESEUX': ['eta7001'],
+  'LEMANIA': ['lemania1873'],
+};
+
 /// Normalizza: maiuscole, senza spazi/trattini/punti.
 String normEngraving(String s) => s.toUpperCase().replaceAll(RegExp(r'[\s\-–_.·/]'), '');
 
@@ -92,6 +126,14 @@ EngravingInfo matchEngravings(String rawText) {
     final rm = RegExp(r'\b(X{1,3}(?:IX|IV|V?I{0,3}))\s*(JEWELS?|RUBIS|RUBINS?|STEINE)').firstMatch(text);
     if (rm != null) jewels = _roman[rm.group(1)];
   }
+  if (jewels == null) {
+    for (final e in _jewelWords.entries) {
+      if (joined.contains(e.key)) {
+        jewels = e.value;
+        break;
+      }
+    }
+  }
   final automatic = text.contains('AUTOMATIC') || text.contains('AUTOMATIQUE') || text.contains('AUTOMATICO')
       ? true
       : null;
@@ -108,6 +150,38 @@ EngravingInfo matchEngravings(String rawText) {
       );
     }
   }
+  // la marca letta: rafforza i suoi calibri e, se il numero manca, li propone
+  for (final b in brandCalibers.entries) {
+    final seen = b.key.length <= 5 ? RegExp('\\b${b.key}\\b').hasMatch(text) : joined.contains(b.key);
+    if (!seen) continue;
+    final ids = b.value.where((id) => calibers.any((c) => c.id == id)).toList();
+    for (var i = 0; i < guesses.length; i++) {
+      if (ids.contains(guesses[i].caliber.id)) {
+        final g = guesses[i];
+        guesses[i] = CaliberGuess(g.caliber, (g.score + 0.05).clamp(0.0, 1.0), [...g.why, 'marca ${_title(b.key)}']);
+      }
+    }
+    if (guesses.every((g) => g.score < 0.7)) {
+      for (final id in ids) {
+        if (guesses.any((g) => g.caliber.id == id)) continue;
+        final c = caliberById(id);
+        var sc = 0.3;
+        final why = ['letto "${_title(b.key)}" ma non il numero del calibro'];
+        if (jewels != null && c.jewels != null) {
+          if ((c.jewels! - jewels).abs() <= 1) {
+            sc += 0.2;
+            why.add('$jewels rubini: coincide');
+          } else {
+            sc -= 0.15;
+          }
+        }
+        if (automatic == true && c.type == WindType.manual) sc -= 0.15;
+        guesses.add(CaliberGuess(c, sc.clamp(0.05, 1.0), why));
+      }
+    }
+  }
   guesses.sort((a, b) => b.score.compareTo(a.score));
   return EngravingInfo(guesses, jewels, automatic, rawText);
 }
+
+String _title(String b) => b == 'GRANDSEIKO' ? 'Grand Seiko' : b.length <= 3 ? b : b[0] + b.substring(1).toLowerCase();

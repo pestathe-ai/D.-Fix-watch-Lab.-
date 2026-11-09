@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../data/calibers.dart';
 import '../logic/caliber_match.dart';
 import '../logic/gemini.dart';
+import '../logic/ocr_prep.dart';
 import 'ai_settings_page.dart';
 import 'identify_page.dart';
 import 'theme.dart';
@@ -68,10 +70,27 @@ class _RecognizePageState extends State<RecognizePage> {
     final merged = <String, CaliberGuess>{};
     try {
       final rec = TextRecognizer(script: TextRecognitionScript.latin);
-      final res = await rec.processImage(InputImage.fromFilePath(x.path));
+      final texts = <String>[];
+      final first = await rec.processImage(InputImage.fromFilePath(x.path));
+      texts.add(first.text);
+      // se non basta, rileggo la foto ruotata e con più contrasto
+      if (matchEngravings(first.text).guesses.every((g) => g.score < 0.8)) {
+        if (mounted) setState(() => _status = 'Rileggo la foto da altre angolazioni…');
+        try {
+          final dir = (await getTemporaryDirectory()).path;
+          for (final v in await ocrVariants(x.path, dir)) {
+            final r = await rec.processImage(InputImage.fromFilePath(v));
+            if (r.text.trim().isNotEmpty) texts.add(r.text);
+            if (matchEngravings(texts.join('\n')).guesses.any((g) => g.score >= 0.85)) break;
+          }
+        } catch (e) {
+          debugPrint('OCR varianti: $e');
+        }
+      }
       await rec.close();
-      final info = matchEngravings(res.text);
-      _ocrText = res.text.trim();
+      final all = texts.join('\n');
+      final info = matchEngravings(all);
+      _ocrText = texts.map((t) => t.trim()).where((t) => t.isNotEmpty).toSet().join('\n—\n');
       _jewels = info.jewels;
       for (final g in info.guesses) {
         merged[g.caliber.id] = g;
@@ -179,8 +198,12 @@ class _RecognizePageState extends State<RecognizePage> {
               ),
             if (_guesses.isEmpty)
               Text(
-                'Non ho trovato il numero del calibro. Prova una foto più vicina alle scritte, oppure usa le domande '
-                'o la sequenza universale.${_jewels != null ? ' Ho letto però $_jewels rubini.' : ''}',
+                (_ocrText == null || _ocrText!.isEmpty)
+                    ? 'Non ho trovato scritte leggibili nella foto. Avvicinati alle scritte incise sui ponti '
+                        '(numero del calibro, "JEWELS"), con luce laterale e senza riflessi. Oppure scrivi tu il numero qui sotto.'
+                    : 'Ho letto delle scritte (le trovi in fondo) ma nessun calibro del mio archivio. '
+                        'Se vedi il numero, scrivilo qui sotto; altrimenti usa le domande o la sequenza universale.'
+                        '${_jewels != null ? ' Ho letto $_jewels rubini.' : ''}',
                 style: const TextStyle(fontSize: 15, height: 1.4),
               ),
             const SizedBox(height: 6),
@@ -213,8 +236,9 @@ class _RecognizePageState extends State<RecognizePage> {
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
+                  initiallyExpanded: _guesses.isEmpty,
                   tilePadding: EdgeInsets.zero,
-                  title: const Text('Testo letto sulla foto', style: TextStyle(fontSize: 14)),
+                  title: const Text('Testo letto sulla foto', style: TextStyle(fontSize: 15)),
                   children: [SelectableText(_ocrText!)],
                 ),
               ),

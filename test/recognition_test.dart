@@ -93,6 +93,21 @@ void main() {
       final g = matchEngravings('VALJOUX 7750').guesses.first.caliber;
       expect(g.chrono, isTrue);
     });
+    test('Rolex 3135 dalle scritte tipiche del ponte', () {
+      final g = matchEngravings('ROLEX\nORIGINAL\nSWISS\nTHIRTYONE (31) JEWELS\nADJUSTED TO 5 POSITIONS\n3135').guesses;
+      expect(g.first.caliber.id, 'rolex3135');
+    });
+    test('solo la marca: propone i suoi calibri, coi rubini davanti', () {
+      final g = matchEngravings('ROLEX\nGENEVA SWISS\n31 JEWELS').guesses;
+      expect(g, isNotEmpty);
+      expect(g.first.caliber.id, startsWith('rolex'));
+      expect(g.first.caliber.jewels, 31);
+    });
+    test('Omega, Vostok e Powermatic', () {
+      expect(matchEngravings('OMEGA CO-AXIAL 8500').guesses.first.caliber.id, 'omega8500');
+      expect(matchEngravings('VOSTOK 2416B 31 JEWELS').guesses.first.caliber.id, 'vostok2416');
+      expect(matchEngravings('SWISS C07.111 23 JEWELS').guesses.first.caliber.id, 'powermatic80');
+    });
     test('testo senza calibro: nessun candidato', () {
       expect(matchEngravings('SWISS MADE ADJUSTED').guesses, isEmpty);
     });
