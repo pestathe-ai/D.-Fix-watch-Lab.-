@@ -14,6 +14,7 @@ import 'glossary_page.dart';
 import 'measure_page.dart';
 import 'how_it_works_page.dart';
 import 'photo_marks.dart';
+import 'render_card.dart';
 import 'scene3d.dart';
 import 'scene_widgets.dart';
 import 'step_timer.dart';
@@ -271,6 +272,10 @@ class _GuidePageState extends State<GuidePage> {
                 color: Brand.blu,
               ),
             ),
+          ],
+          if (renderSteps.contains(step.id)) ...[
+            const SizedBox(height: 14),
+            RenderCard(stepId: step.id, title: step.title, hasScrews: step.todo.any((t) => t.toLowerCase().contains('vit'))),
           ],
           if (_photoSteps.contains(step.id) || reassemblyOf.containsKey(step.id)) ...[
             const SizedBox(height: 14),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'how_it_works_page.dart';
+import 'render_card.dart';
 import 'scene3d.dart';
 import 'scene_widgets.dart';
 import 'theme.dart';
@@ -131,6 +132,22 @@ class _HowItWorks3DState extends State<HowItWorks3D> with SingleTickerProviderSt
     };
     final cap = captions[_phase] ?? captions['libero']!;
     return [
+      Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const RenderViewer(asset: 'assets/renders/scappamento.webp', title: 'Scappamento al rallentatore'))),
+            child: AspectRatio(aspectRatio: 4 / 3, child: Image.asset('assets/renders/scappamento.webp', fit: BoxFit.cover)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+            child: Text('Video realistico, 8 volte più lento del vero: un\'oscillazione completa del bilanciere, due "tic".',
+                style: TextStyle(fontSize: 12.5, color: Brand.inchiostro.withValues(alpha: 0.6))),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 12),
       InfoBox(
         icon: _phase == 'libero' ? Icons.waves : (_phase == 'sblocco' ? Icons.lock_open : Icons.bolt),
         title: cap.$1,
