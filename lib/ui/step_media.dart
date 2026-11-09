@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../art/scene.dart';
+import '../data/calibers.dart';
 import '../data/components.dart';
 import '../data/steps.dart';
 import 'glossary_page.dart';
@@ -39,6 +41,12 @@ class StepMediaCard extends StatefulWidget {
   final String sceneLabel;
   final List<WatchPart> parts;
   final Widget instructions;
+  /// Il calibro della revisione: per dire quanto lo schema gli somiglia.
+  final Caliber? caliber;
+  /// "Sul tuo orologio": foto del movimento vero con le viti segnate.
+  final Widget? myWatch;
+  /// Se c'è già una foto del passo: allora si apre su quella.
+  final bool hasMyPhoto;
 
   const StepMediaCard({
     super.key,
@@ -47,22 +55,29 @@ class StepMediaCard extends StatefulWidget {
     required this.sceneLabel,
     required this.parts,
     required this.instructions,
+    this.caliber,
+    this.myWatch,
+    this.hasMyPhoto = false,
   });
 
   @override
   State<StepMediaCard> createState() => _StepMediaCardState();
 }
 
+enum _Kind { mine, scene, photo }
+
 class _Page {
   final String label;
   final IconData icon;
+  final _Kind kind;
   final String? asset;
   final WatchPart? part;
-  const _Page(this.label, this.icon, {this.asset, this.part});
+  const _Page(this.label, this.icon, this.kind, {this.asset, this.part});
 }
 
 class _StepMediaCardState extends State<StepMediaCard> {
-  int _i = 0;
+  // con la foto del tuo orologio si parte da quella, altrimenti dal 3D
+  late int _i = widget.myWatch != null && !widget.hasMyPhoto ? 1 : 0;
   final _chips = ScrollController();
 
   @override
@@ -72,13 +87,16 @@ class _StepMediaCardState extends State<StepMediaCard> {
   }
 
   List<_Page> get _pages {
-    final out = <_Page>[_Page(widget.sceneLabel, Icons.view_in_ar)];
+    final out = <_Page>[
+      if (widget.myWatch != null) const _Page('Il tuo orologio', Icons.watch_outlined, _Kind.mine),
+      _Page(widget.sceneLabel, Icons.view_in_ar, _Kind.scene),
+    ];
     if (renderSteps.contains(widget.step.id)) {
-      out.add(_Page('Foto', Icons.photo_camera_outlined, asset: renderAsset(widget.step.id)));
+      out.add(_Page('Foto tipo', Icons.photo_camera_outlined, _Kind.photo, asset: renderAsset(widget.step.id)));
     }
     for (final p in widget.parts) {
       final a = partPhoto(p.id);
-      if (a != null) out.add(_Page(p.name, Icons.settings_outlined, asset: a, part: p));
+      if (a != null) out.add(_Page(p.name, Icons.settings_outlined, _Kind.photo, asset: a, part: p));
     }
     return out;
   }
@@ -119,21 +137,21 @@ class _StepMediaCardState extends State<StepMediaCard> {
           ),
         ),
         // il contenuto: la scena resta viva (non si ricarica) quando guardi le foto
+        if (p.kind == _Kind.scene) _genericNotice(context),
         IndexedStack(
-          index: i == 0 ? 0 : 1,
+          index: p.kind == _Kind.scene ? 0 : 1,
           sizing: StackFit.loose,
           children: [
             Visibility(
-              visible: i == 0,
+              visible: p.kind == _Kind.scene,
               maintainState: true,
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  cardTheme: Theme.of(context).cardTheme.copyWith(color: Colors.transparent, shape: const RoundedRectangleBorder()),
-                ),
-                child: widget.scene,
-              ),
+              child: _flat(context, widget.scene),
             ),
-            if (i > 0) _photo(context, p) else const SizedBox.shrink(),
+            switch (p.kind) {
+              _Kind.mine => _flat(context, widget.myWatch!),
+              _Kind.photo => _photo(context, p),
+              _Kind.scene => const SizedBox.shrink(),
+            },
           ],
         ),
         // avanti e indietro tra le immagini
@@ -173,6 +191,56 @@ class _StepMediaCardState extends State<StepMediaCard> {
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
           child: widget.instructions,
         ),
+      ]),
+    );
+  }
+
+  /// Le schede dentro il riquadro non fanno "carta nella carta".
+  Widget _flat(BuildContext context, Widget child) => Theme(
+        data: Theme.of(context).copyWith(
+          cardTheme: Theme.of(context).cardTheme.copyWith(color: Colors.transparent, shape: const RoundedRectangleBorder()),
+        ),
+        child: child,
+      );
+
+  /// Avviso: il 3D è uno schema generico, non il calibro vero.
+  Widget _genericNotice(BuildContext context) {
+    final c = widget.caliber;
+    final known = c != null && !c.generic;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 4),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.info_outline, color: Brand.arancio, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              known
+                  ? 'Schema generico: il tuo ${c.name.split('(').first.trim()} ha ponti e viti in posizioni diverse. '
+                      'Pezzi e ordine sono gli stessi.'
+                  : 'Schema generico di un movimento tipico: pezzi e ordine sono gli stessi, la forma dei ponti cambia.',
+              style: const TextStyle(fontSize: 14, height: 1.35),
+            ),
+          ),
+        ]),
+        if (c != null) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 28),
+            child: Text('Com\'è fatto: ${c.architecture}.',
+                style: TextStyle(fontSize: 13.5, color: Brand.inchiostro.withValues(alpha: 0.7))),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 18),
+            child: TextButton.icon(
+              onPressed: () => launchUrl(c.photosUrl, mode: LaunchMode.externalApplication),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: Text(known ? 'Foto reali del ${c.name.split('(').first.split('/').first.trim()}' : 'Foto di movimenti reali'),
+            ),
+          ),
+        ],
       ]),
     );
   }

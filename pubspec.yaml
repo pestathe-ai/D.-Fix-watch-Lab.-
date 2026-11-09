@@ -1,7 +1,7 @@
 name: d_fix_watch_lab
 description: "D. Fix Watch Lab – guida passo passo alla revisione di orologi meccanici."
 publish_to: 'none'
-version: 0.12.2+15
+version: 0.13.0+16
 
 environment:
   sdk: ^3.6.0
@@ -16,6 +16,7 @@ dependencies:
   webview_flutter: ^4.10.0
   google_mlkit_text_recognition: '>=0.13.0 <2.0.0'
   image: ^4.2.0
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

@@ -16,6 +16,14 @@ if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$MANIFEST"
 fi
 sed -i 's#android:label="d_fix_watch_lab"#android:label="D. Fix Watch Lab"#' "$MANIFEST"
+# per aprire i link nel browser (url_launcher, Android 11+)
+if ! grep -q 'android:scheme="https"' "$MANIFEST"; then
+  if grep -q '<queries>' "$MANIFEST"; then
+    sed -i 's#<queries>#<queries>\n        <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>#' "$MANIFEST"
+  else
+    sed -i 's#</manifest>#    <queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent></queries>\n</manifest>#' "$MANIFEST"
+  fi
+fi
 
 PLIST=ios/Runner/Info.plist
 if [ "$(uname)" = "Darwin" ] && [ -f "$PLIST" ]; then

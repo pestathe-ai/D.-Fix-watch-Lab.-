@@ -26,6 +26,13 @@ class Scene3DController {
 
   bool ready = false;
   String? _lastShow;
+  String? _layout;
+
+  /// Famiglia del movimento: per ora secondi piccoli o centrali.
+  void layout({required bool smallSeconds}) {
+    _layout = 'W3D.layout(${jsonEncode({'smallSeconds': smallSeconds})})';
+    if (ready) _js(_layout!);
+  }
   late final WebViewController web = WebViewController()
     ..setJavaScriptMode(JavaScriptMode.unrestricted)
     ..setBackgroundColor(const Color(0xFFDFE3EA))
@@ -43,6 +50,7 @@ class Scene3DController {
       case 'ready':
         ready = true;
         _js('W3D.setup(${jsonEncode({'screws': screwDefs.map((s) => s.toJson()).toList()})})');
+        if (_layout != null) _js(_layout!);
         if (_lastShow != null) _js(_lastShow!);
         if (_lastDemo != null) _js(_lastDemo!);
         onReady?.call();
@@ -131,6 +139,7 @@ class StepScene3D extends StatefulWidget {
   final int index;
   final bool automatic;
   final bool date;
+  final bool smallSeconds;
   final VoidCallback onNoGl;
 
   const StepScene3D({
@@ -139,6 +148,7 @@ class StepScene3D extends StatefulWidget {
     required this.index,
     required this.automatic,
     required this.date,
+    this.smallSeconds = false,
     required this.onNoGl,
   });
 
@@ -174,12 +184,14 @@ class _StepScene3DState extends State<StepScene3D> with AutomaticKeepAliveClient
   void initState() {
     super.initState();
     _compute();
+    c.layout(smallSeconds: widget.smallSeconds);
     c.show(_stateMap(0, animate: false));
   }
 
   @override
   void didUpdateWidget(covariant StepScene3D old) {
     super.didUpdateWidget(old);
+    if (old.smallSeconds != widget.smallSeconds) c.layout(smallSeconds: widget.smallSeconds);
     if (old.index != widget.index || old.automatic != widget.automatic || old.date != widget.date) {
       _compute();
       _a = 0;

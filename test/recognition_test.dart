@@ -142,6 +142,17 @@ void main() {
       expect(matchEngravings('17 JEWELS\nPS31').guesses.first.caliber.id, 'jeambrun_ps31');
       expect(matchEngravings('CUPILLARD 233').guesses.first.caliber.id, 'fe233');
     });
+    test('famiglia del movimento: secondi piccoli e com\'è fatto', () {
+      final ps31 = caliberById('jeambrun_ps31');
+      expect(ps31.smallSeconds, isTrue);
+      expect(ps31.architecture, contains('secondi piccoli'));
+      expect(ps31.architecture, contains('carica manuale'));
+      expect(caliberById('nh35').smallSeconds, isFalse);
+      expect(caliberById('nomosalpha').architecture, contains('tre quarti'));
+      expect(ps31.photosUrl.toString(), contains('Jeambrun'));
+      final c = Caliber.fromJson(Caliber.unknown(name: 'X', automatic: false).toJson());
+      expect(c.smallSeconds, isFalse);
+    });
     test('ogni marca rimanda a calibri esistenti', () {
       final ids = calibers.map((c) => c.id).toSet();
       for (final e in brandCalibers.entries) {

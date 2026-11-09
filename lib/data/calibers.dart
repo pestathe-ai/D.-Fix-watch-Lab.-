@@ -17,6 +17,8 @@ class Caliber {
   /// Scritte incise che lo identificano (normalizzate: maiuscole, senza spazi e trattini).
   final List<String> engravings;
   final bool chrono;
+  /// Secondi piccoli (sottoquadrante) invece che centrali.
+  final bool smallSec;
 
   const Caliber({
     required this.id,
@@ -32,7 +34,31 @@ class Caliber {
     this.generic = false,
     this.engravings = const [],
     this.chrono = false,
+    this.smallSec = false,
   });
+
+  /// Secondi piccoli: dal calibro o dall'elenco dei calibri noti.
+  bool get smallSeconds => smallSec || _smallSecondsIds.contains(id);
+
+  /// Com'è fatto, in una riga (per capire quanto somiglia allo schema 3D generico).
+  String get architecture {
+    final parts = <String>[
+      type == WindType.automatic
+          ? (id == 'omega33x' ? 'automatico a martelletto (bumper)' : 'automatico con rotore')
+          : 'carica manuale',
+      smallSeconds ? 'secondi piccoli' : 'secondi centrali',
+      hasDate ? 'con data' : 'senza data',
+      if (chrono) 'cronografo',
+      if (_architectureExtra[id] != null) _architectureExtra[id]!,
+    ];
+    return parts.join(', ');
+  }
+
+  /// Ricerca di foto reali del calibro (si aprono nel browser, non le copio nell'app).
+  Uri get photosUrl {
+    final q = generic ? 'movimento orologio meccanico' : '${name.split('(').first.trim()} watch movement caliber';
+    return Uri.https('www.google.com', '/search', {'tbm': 'isch', 'q': q});
+  }
 
   /// Calibro creato al volo per un movimento che non è in archivio (segue la sequenza universale).
   bool get custom => id.startsWith('custom');
@@ -47,6 +73,7 @@ class Caliber {
         'hasDate': hasDate,
         'notes': notes,
         'chrono': chrono,
+        'smallSeconds': smallSeconds,
       };
 
   factory Caliber.fromJson(Map<String, dynamic> j) => Caliber(
@@ -60,6 +87,7 @@ class Caliber {
         notes: ((j['notes'] as List?) ?? const []).map((e) => e.toString()).toList(),
         generic: true,
         chrono: (j['chrono'] as bool?) ?? false,
+        smallSec: (j['smallSeconds'] as bool?) ?? false,
       );
 
   /// Movimento non in archivio: tengo il nome che hai letto (o che ha detto l'AI) e uso la sequenza universale.
@@ -1748,6 +1776,34 @@ const List<Caliber> calibers = [
     ],
   ),
 ];
+
+/// Calibri con i secondi piccoli (lancetta dei secondi su un quadrantino a parte).
+const _smallSecondsIds = {
+  'eta6497', 'st36', 'unitas6325', 'eta7001', 'jeambrun_ps31', 'molnija3602', 'omega30t2', 'pobeda2602', 'eta2895',
+  'nomosalpha', 'valjoux7750', 'omega1861', 'omega3861', 'omega321', 'lemania1873', 'st1901', 'poljot3133',
+  'zenith400', 'valjoux72', 'landeron48', 'rolex4130', 'breitlingb01',
+};
+
+/// Particolarità costruttive che cambiano lo smontaggio rispetto allo schema generico.
+const _architectureExtra = {
+  'nomosalpha': 'platina tre quarti (un unico grande ponte)',
+  'slava2427': 'due bariletti',
+  'slava2414': 'due bariletti',
+  'omega8500': 'due bariletti, scappamento Co-Axial',
+  'omega8800': 'scappamento Co-Axial',
+  'omega3861': 'scappamento Co-Axial',
+  'omega2500': 'scappamento Co-Axial',
+  'raketa2609': 'secondi centrali indiretti',
+  'jeambrun_ps31': 'piastrina sul cricchetto (PS31 A)',
+  'raketa2628': 'modulo automatico sopra il movimento manuale',
+  'rolex3135': 'ponte del bilanciere a doppio braccio',
+  'rolex3235': 'ponte del bilanciere a doppio braccio',
+  'rolex3130': 'ponte del bilanciere a doppio braccio',
+  'rolex3230': 'ponte del bilanciere a doppio braccio',
+  'tudormt56': 'ponte del bilanciere a doppio braccio',
+  'oris400': 'due bariletti',
+  'accutron214': 'diapason elettronico, niente bilanciere',
+};
 
 Caliber caliberById(String id) =>
     calibers.firstWhere((c) => c.id == id, orElse: () => calibers.first);

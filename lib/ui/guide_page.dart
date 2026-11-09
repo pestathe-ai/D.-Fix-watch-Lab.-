@@ -284,8 +284,22 @@ class _GuidePageState extends State<GuidePage> {
             key: ValueKey('media-${step.id}'),
             step: step,
             scene: _scene(),
-            sceneLabel: _use3d && !_noGl ? 'Video 3D' : 'Animazione',
+            sceneLabel: _use3d && !_noGl ? 'Schema 3D' : 'Schema',
             parts: stepParts,
+            caliber: r.caliber,
+            hasMyPhoto: r.marks[step.id] != null || reassemblyOf.containsKey(step.id),
+            myWatch: (_photoSteps.contains(step.id) || reassemblyOf.containsKey(step.id))
+                ? MyWatchCard(
+                    key: ValueKey('mw-${step.id}'),
+                    revision: r,
+                    store: widget.store,
+                    step: step,
+                    steps: _steps,
+                    index: _i,
+                    automatic: r.caliber.type == WindType.automatic,
+                    date: r.hasDate,
+                  )
+                : null,
             instructions: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Cosa fare', style: Brand.sora(17, 800, color: Brand.inchiostro)),
               const SizedBox(height: 10),
@@ -365,20 +379,6 @@ class _GuidePageState extends State<GuidePage> {
                   style: const TextStyle(fontSize: 15),
                 ),
               ),
-          ],
-          // 3. il tuo orologio: foto con le viti segnate
-          if (_photoSteps.contains(step.id) || reassemblyOf.containsKey(step.id)) ...[
-            const SizedBox(height: 14),
-            MyWatchCard(
-              key: ValueKey('mw-${step.id}'),
-              revision: r,
-              store: widget.store,
-              step: step,
-              steps: _steps,
-              index: _i,
-              automatic: r.caliber.type == WindType.automatic,
-              date: r.hasDate,
-            ),
           ],
           const SizedBox(height: 16),
           // 4. tutto il resto, chiuso finché non serve
@@ -480,6 +480,7 @@ class _GuidePageState extends State<GuidePage> {
         index: _i,
         automatic: r.caliber.type == WindType.automatic,
         date: r.hasDate,
+        smallSeconds: r.caliber.smallSeconds,
         onNoGl: () {
           if (mounted) setState(() => _noGl = true);
         },

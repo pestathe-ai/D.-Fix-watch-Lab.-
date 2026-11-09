@@ -1857,6 +1857,42 @@ function drawLabels() {
   for (let i = used; i < labelPool.length; i++) labelPool[i].style.display = 'none';
 }
 
+// ------------------------------------------------------------------ famiglie di movimento
+let smallSec = null; // {hand, dialRing, central}
+function applyLayout(cfg) {
+  const L = items.lancette && items.lancette.obj;
+  const Q = items.quadrante && items.quadrante.obj;
+  if (!L || !Q) return;
+  const H = L.userData.hands;
+  if (!smallSec) {
+    const up = -Math.PI / 2;
+    const P = G.fourth;
+    // lancetta dei secondi piccoli sul perno della ruota dei secondi
+    const hand = new THREE.Group();
+    hand.position.set(X3(P[0]), 0, Z3(P[1]));
+    hand.add(mesh(rel(extrude(bar(polar(P, 22, up + Math.PI), polar(P, 92, up), 5), -8.3, 0.1, 0.02), P), MAT.orange()));
+    hand.add(mesh(rel(cyl(0.8, -8.4, -7.6, 16), [500, 500]), MAT.hands()));
+    hand.visible = false;
+    L.add(hand);
+    // quadrantino dei secondi
+    const dialRing = new THREE.Group();
+    dialRing.add(mesh(extrude(ring(P, 108, 102), -7.66, 0.05, 0.01), MAT.hands(), false));
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      dialRing.add(mesh(extrude(bar(polar(P, 92, a), polar(P, i % 3 === 0 ? 76 : 84, a), 3.2), -7.66, 0.05, 0.01), MAT.hands(), false));
+    }
+    dialRing.visible = false;
+    Q.add(dialRing);
+    smallSec = { hand, dialRing, central: H.s };
+  }
+  const small = !!cfg.smallSeconds;
+  smallSec.central.visible = !small;
+  smallSec.hand.visible = small;
+  smallSec.dialRing.visible = small;
+  H.s = small ? smallSec.hand : smallSec.central;
+  setHands(L, 10 * 3600 + 10 * 60 + 30);
+}
+
 // ------------------------------------------------------------------ API per Flutter
 window.W3D = {
   setup(cfg) {
@@ -1875,6 +1911,10 @@ window.W3D = {
     for (const it of Object.values(items)) setOpacity(it.obj, xray && it.cover ? 0.22 : 1);
   },
   _slow(k) { SPEED = k; },
+  /// Adatta lo schema alla famiglia del movimento (es. secondi piccoli invece che centrali).
+  layout(cfg) {
+    try { applyLayout(cfg || {}); } catch (e) { send({ type: 'error', msg: String(e && e.stack || e) }); }
+  },
   live(o) { setLive(o || {}); },
   demo(cfg) {
     try {
