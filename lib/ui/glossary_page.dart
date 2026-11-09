@@ -103,7 +103,7 @@ class _GlossaryPageState extends State<GlossaryPage> {
               prefixIcon: const Icon(Icons.search),
               hintText: 'Cerca un pezzo (es. ancora, tiretto)',
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Brand.tenue,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             ),
             onChanged: (v) => setState(() => _q = v),

@@ -29,6 +29,21 @@ class _RecognizePageState extends State<RecognizePage> {
   int? _jewels;
   String? _aiNote;
   bool _aiOn = false;
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  void _typed(String t) {
+    final info = matchEngravings(t);
+    setState(() {
+      _guesses = info.guesses;
+      if (_photo == null) _photo = '';
+    });
+  }
 
   @override
   void initState() {
@@ -63,7 +78,9 @@ class _RecognizePageState extends State<RecognizePage> {
       }
     } catch (e) {
       _ocrText = null;
-      _aiNote = 'Lettura delle scritte non riuscita ($e).';
+      debugPrint('OCR: $e');
+      _aiNote = 'Non sono riuscito a leggere le scritte su questa foto. Riprova con più luce, '
+          'oppure rispondi a qualche domanda qui sotto.';
     }
     final ai = await AiSettings.load();
     if (ai.enabled) {
@@ -111,7 +128,7 @@ class _RecognizePageState extends State<RecognizePage> {
             color: Brand.blu,
           ),
           const SizedBox(height: 12),
-          if (_photo != null)
+          if (_photo != null && _photo!.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
               child: Image.file(File(_photo!), height: 240, fit: BoxFit.cover),
@@ -129,7 +146,7 @@ class _RecognizePageState extends State<RecognizePage> {
                 child: FilledButton.icon(
                   onPressed: () => _shoot(ImageSource.camera),
                   icon: const Icon(Icons.photo_camera),
-                  label: Text(_photo == null ? 'Scatta la foto' : 'Rifai la foto'),
+                  label: Text(_photo == null || _photo!.isEmpty ? 'Scatta la foto' : 'Rifai la foto'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -166,6 +183,18 @@ class _RecognizePageState extends State<RecognizePage> {
                 'o la sequenza universale.${_jewels != null ? ' Ho letto però $_jewels rubini.' : ''}',
                 style: const TextStyle(fontSize: 15, height: 1.4),
               ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _code,
+              onChanged: _typed,
+              textCapitalization: TextCapitalization.characters,
+              style: const TextStyle(fontSize: 18),
+              decoration: const InputDecoration(
+                labelText: 'Leggi tu il numero? Scrivilo qui',
+                hintText: 'es. NH35, 2824, 6R15',
+                prefixIcon: Icon(Icons.keyboard_outlined),
+              ),
+            ),
             if (_aiNote != null) ...[
               const SizedBox(height: 8),
               Text(_aiNote!, style: TextStyle(fontSize: 13, color: Colors.red.shade700)),

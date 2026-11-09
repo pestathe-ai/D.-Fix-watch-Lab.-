@@ -2,11 +2,15 @@ import 'dart:ui' show FontVariation;
 
 import 'package:flutter/material.dart';
 
+/// Colori dell'interfaccia: verde petrolio e corallo su bianco.
+/// (L'icona resta nei colori del marchio Dom Studio.)
 class Brand {
-  static const blu = Color(0xFF1D3A8A);
-  static const arancio = Color(0xFFF28C38);
-  static const carta = Color(0xFFFFF8F0);
-  static const inchiostro = Color(0xFF14213D);
+  static const blu = Color(0xFF0F766E); // accento principale: verde petrolio
+  static const arancio = Color(0xFFF97362); // secondo accento: corallo
+  static const carta = Color(0xFFFFFFFF); // fondo
+  static const inchiostro = Color(0xFF12302C); // testi
+  static const tenue = Color(0xFFF2F7F6); // carte e riquadri
+  static const verdeChiaro = Color(0xFFD9EFEC);
 
   static TextStyle sora(double size, int weight, {Color? color}) => TextStyle(
         fontFamily: 'Sora',
@@ -38,27 +42,53 @@ ThemeData buildTheme() {
       titleTextStyle: Brand.sora(19, 700, color: Brand.inchiostro),
     ),
     cardTheme: CardThemeData(
-      color: Colors.white,
+      color: Brand.tenue,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Brand.inchiostro.withValues(alpha: 0.08)),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    ),
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(fontSize: 17, height: 1.45, color: Brand.inchiostro),
+      bodyMedium: TextStyle(fontSize: 16, height: 1.45, color: Brand.inchiostro),
+      titleMedium: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Brand.inchiostro),
+    ),
+    listTileTheme: const ListTileThemeData(
+      minVerticalPadding: 12,
+      titleTextStyle: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Brand.inchiostro),
+      subtitleTextStyle: TextStyle(fontSize: 14.5, height: 1.35, color: Color(0xFF4A6460)),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(48, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: Brand.sora(15, 600),
+        minimumSize: const Size(56, 58),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: Brand.sora(17, 700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(48, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: Brand.sora(15, 600),
+        minimumSize: const Size(56, 54),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        foregroundColor: Brand.blu,
+        side: const BorderSide(color: Brand.blu, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: Brand.sora(16, 600),
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(minimumSize: const Size(48, 48), textStyle: Brand.sora(15.5, 600)),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Brand.tenue,
+      labelStyle: const TextStyle(fontSize: 16),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+    ),
+    expansionTileTheme: const ExpansionTileThemeData(
+      shape: Border(),
+      collapsedShape: Border(),
+      iconColor: Brand.blu,
+      collapsedIconColor: Brand.blu,
     ),
   );
 }
@@ -97,9 +127,9 @@ class InfoBox extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Brand.sora(14, 700, color: Brand.inchiostro)),
+                Text(title, style: Brand.sora(15.5, 700, color: Brand.inchiostro)),
                 const SizedBox(height: 4),
-                Text(text, style: const TextStyle(fontSize: 15, height: 1.4, color: Brand.inchiostro)),
+                Text(text, style: const TextStyle(fontSize: 16.5, height: 1.45, color: Brand.inchiostro)),
               ],
             ),
           ),

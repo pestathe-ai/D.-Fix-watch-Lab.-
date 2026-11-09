@@ -252,13 +252,13 @@ class _GuidePageState extends State<GuidePage> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
         children: [
           Text('PASSO ${_i + 1} DI ${_steps.length} · ${step.phase.toUpperCase()}',
-              style: Brand.sora(12, 700, color: Brand.blu).copyWith(letterSpacing: 1.0)),
+              style: Brand.sora(13, 700, color: Brand.blu).copyWith(letterSpacing: 1.0)),
           const SizedBox(height: 6),
-          Text(step.title, style: Brand.sora(24, 800, color: Brand.inchiostro)),
+          Text(step.title, style: Brand.sora(26, 800, color: Brand.inchiostro)),
           if (step.optionalLabel != null) ...[
             const SizedBox(height: 6),
             Text(step.optionalLabel!,
-                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Brand.inchiostro.withValues(alpha: 0.65))),
+                style: TextStyle(fontSize: 15, fontStyle: FontStyle.italic, color: Brand.inchiostro.withValues(alpha: 0.65))),
           ],
           if (_i == 0 && r.caliber.notes.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -273,10 +273,68 @@ class _GuidePageState extends State<GuidePage> {
               ),
             ),
           ],
-          if (renderSteps.contains(step.id)) ...[
-            const SizedBox(height: 14),
-            RenderCard(stepId: step.id, title: step.title, hasScrews: step.todo.any((t) => t.toLowerCase().contains('vit'))),
+          const SizedBox(height: 14),
+          // 1. l'immagine: foto realistica se c'è, altrimenti la scena 3D/2D
+          if (renderSteps.contains(step.id))
+            RenderCard(stepId: step.id, title: step.title, hasScrews: step.todo.any((t) => t.toLowerCase().contains('vit')))
+          else
+            _scene(),
+          const SizedBox(height: 14),
+          // 2. cosa fare: a numeri grandi, una cosa per riga
+          for (var k = 0; k < step.todo.length; k++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(color: Brand.blu, shape: BoxShape.circle),
+                    child: Text('${k + 1}', style: Brand.sora(15, 800, color: Colors.white)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(step.todo[k], style: const TextStyle(fontSize: 18, height: 1.45, color: Brand.inchiostro)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (step.warning != null) ...[
+            const SizedBox(height: 4),
+            InfoBox(icon: Icons.warning_amber_rounded, title: 'Attenzione', text: step.warning!, color: Colors.red.shade700),
           ],
+          if (step.lube != null) ...[
+            const SizedBox(height: 10),
+            InfoBox(icon: Icons.water_drop_outlined, title: 'Olio', text: step.lube!, color: Brand.arancio),
+          ],
+          if (step.timerSeconds != null) ...[
+            const SizedBox(height: 12),
+            StepTimer(key: ValueKey(step.id), seconds: step.timerSeconds!),
+          ],
+          if (step.id == 'valutazione' || step.id == 'regola') ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _measure,
+              icon: const Icon(Icons.graphic_eq),
+              label: const Text('Misura la marcia e salva'),
+            ),
+            for (final m in r.measurements.where((m) => m.label == step.title))
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '${m.at.day}/${m.at.month} ${m.at.hour}:${m.at.minute.toString().padLeft(2, '0')} · '
+                  '${m.rate >= 0 ? '+' : ''}${m.rate.toStringAsFixed(0)} s/g · '
+                  'battuta ${m.beatError.toStringAsFixed(1)} ms',
+                  style: const TextStyle(fontSize: 15),
+                ),
+              ),
+          ],
+          // 3. il tuo orologio: foto con le viti segnate
           if (_photoSteps.contains(step.id) || reassemblyOf.containsKey(step.id)) ...[
             const SizedBox(height: 14),
             MyWatchCard(
@@ -290,157 +348,96 @@ class _GuidePageState extends State<GuidePage> {
               date: r.hasDate,
             ),
           ],
-          const SizedBox(height: 14),
-          if (_use3d && !_noGl)
-            StepScene3D(
-              steps: _steps,
-              index: _i,
-              automatic: r.caliber.type == WindType.automatic,
-              date: r.hasDate,
-              onNoGl: () {
-                if (mounted) setState(() => _noGl = true);
-              },
-            )
-          else
-            StepScene(
-              steps: _steps,
-              index: _i,
-              automatic: r.caliber.type == WindType.automatic,
-              date: r.hasDate,
-            ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Cosa fare', style: Brand.sora(15, 700, color: Brand.inchiostro)),
-                  const SizedBox(height: 8),
-                  for (var k = 0; k < step.todo.length; k++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(color: Brand.blu, shape: BoxShape.circle),
-                            child: Text('${k + 1}', style: Brand.sora(12, 700, color: Brand.carta)),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(step.todo[k], style: const TextStyle(fontSize: 16, height: 1.4))),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          InfoBox(icon: Icons.lightbulb_outline, title: 'Perché', text: step.why, color: Brand.blu),
-          if (_howTab(step.id) != null) ...[
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => openHowItWorks(context, tab: _howTab(step.id)!.$1),
-              icon: const Icon(Icons.play_circle_outline),
-              label: Text('Guarda l\'animazione: ${_howTab(step.id)!.$2}'),
-            ),
-          ],
-          if (step.warning != null) ...[
-            const SizedBox(height: 10),
-            InfoBox(icon: Icons.warning_amber_rounded, title: 'Attenzione', text: step.warning!, color: Colors.red.shade700),
-          ],
-          if (step.lube != null) ...[
-            const SizedBox(height: 10),
-            InfoBox(icon: Icons.water_drop_outlined, title: 'Lubrificazione', text: step.lube!, color: Brand.arancio),
-          ],
-          if (step.timerSeconds != null) ...[
-            const SizedBox(height: 12),
-            StepTimer(key: ValueKey(step.id), seconds: step.timerSeconds!),
-          ],
-          if (stepParts.isNotEmpty) ...[
-            const SizedBox(height: 22),
-            Text('I pezzi che stai toccando', style: Brand.sora(17, 800, color: Brand.inchiostro)),
-            const SizedBox(height: 4),
-            Text('Tocca un pezzo per sapere come funziona.',
-                style: TextStyle(fontSize: 13.5, color: Brand.inchiostro.withValues(alpha: 0.6))),
-            const SizedBox(height: 10),
-            for (final p in stepParts) ...[
-              PartCard(key: ValueKey('${step.id}-${p.id}'), part: p),
-              const SizedBox(height: 8),
-            ],
-          ],
-          const SizedBox(height: 18),
-          Row(
+          const SizedBox(height: 16),
+          // 4. tutto il resto, chiuso finché non serve
+          _More(
+            key: ValueKey('more1-${step.id}'),
+            icon: Icons.lightbulb_outline,
+            title: 'Perché si fa',
             children: [
-              Expanded(
-                child: Text(step.photo ? 'Foto (consigliata)' : 'Foto',
-                    style: Brand.sora(15, 700, color: Brand.inchiostro)),
-              ),
-              IconButton(
-                tooltip: 'Dalla galleria',
-                onPressed: () => _photo(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined),
-              ),
-              IconButton.filledTonal(
-                tooltip: 'Scatta',
-                onPressed: () => _photo(ImageSource.camera),
-                icon: const Icon(Icons.photo_camera),
-              ),
+              Text(step.why, style: const TextStyle(fontSize: 16.5, height: 1.45)),
+              if (_howTab(step.id) != null) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => openHowItWorks(context, tab: _howTab(step.id)!.$1),
+                  icon: const Icon(Icons.play_circle_outline),
+                  label: Text('Animazione: ${_howTab(step.id)!.$2}'),
+                ),
+              ],
             ],
           ),
-          if (photos.isNotEmpty)
-            SizedBox(
-              height: 96,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: photos.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (ctx, k) => GestureDetector(
-                  onTap: () => _viewPhoto(photos[k]),
-                  onLongPress: () => _deletePhoto(photos[k]),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(File(photos[k]), width: 96, height: 96, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(width: 96, color: Colors.black12)),
+          if (stepParts.isNotEmpty)
+            _More(
+            key: ValueKey('more2-${step.id}'),
+              icon: Icons.settings_outlined,
+              title: 'I pezzi di questo passo (${stepParts.length})',
+              children: [
+                for (final p in stepParts) ...[
+                  PartCard(key: ValueKey('${step.id}-${p.id}'), part: p),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          if (renderSteps.contains(step.id))
+            _More(
+            key: ValueKey('more3-${step.id}'),
+              icon: Icons.view_in_ar_outlined,
+              title: 'Vista ${_use3d && !_noGl ? '3D' : 'animata'} da girare',
+              children: [_scene()],
+            ),
+          _More(
+            key: ValueKey('more4-${step.id}'),
+            icon: Icons.photo_camera_outlined,
+            title: photos.isEmpty ? 'Foto e note' : 'Foto e note (${photos.length})',
+            initiallyExpanded: photos.isNotEmpty || (r.notes[step.id]?.isNotEmpty ?? false),
+            children: [
+              Row(children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _photo(ImageSource.camera),
+                    icon: const Icon(Icons.photo_camera),
+                    label: const Text('Scatta'),
                   ),
                 ),
-              ),
-            ),
-          if (step.id == 'valutazione' || step.id == 'regola') ...[
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _measure,
-              icon: const Icon(Icons.graphic_eq),
-              label: const Text('Misura e salva'),
-            ),
-            for (final m in r.measurements.where((m) => m.label == step.title))
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  '${m.at.day}/${m.at.month} ${m.at.hour}:${m.at.minute.toString().padLeft(2, '0')} · '
-                  '${m.rate >= 0 ? '+' : ''}${m.rate.toStringAsFixed(0)} s/g · '
-                  'battuta ${m.beatError.toStringAsFixed(1)} ms',
-                  style: const TextStyle(fontSize: 14),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _photo(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Galleria'),
+                  ),
                 ),
+              ]),
+              if (photos.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 96,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: photos.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, k) => GestureDetector(
+                      onTap: () => _viewPhoto(photos[k]),
+                      onLongPress: () => _deletePhoto(photos[k]),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(File(photos[k]), width: 96, height: 96, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(width: 96, color: Colors.black12)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              TextField(
+                controller: _notes,
+                minLines: 2,
+                maxLines: 5,
+                onChanged: (_) => _saveNote(),
+                onEditingComplete: () => widget.store.save(),
+                decoration: const InputDecoration(labelText: 'Le tue note su questo passo'),
               ),
-          ],
-          const SizedBox(height: 14),
-          TextField(
-            controller: _notes,
-            minLines: 2,
-            maxLines: 5,
-            onChanged: (_) => _saveNote(),
-            onEditingComplete: () => widget.store.save(),
-            decoration: InputDecoration(
-              labelText: 'Le tue note su questo passo',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-            ),
+            ],
           ),
         ],
       ),
@@ -449,10 +446,14 @@ class _GuidePageState extends State<GuidePage> {
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
           child: Row(
             children: [
-              IconButton.outlined(
-                tooltip: 'Indietro',
-                onPressed: _i == 0 ? null : () => _go(_i - 1),
-                icon: const Icon(Icons.arrow_back),
+              SizedBox(
+                width: 58,
+                height: 58,
+                child: IconButton.outlined(
+                  tooltip: 'Indietro',
+                  onPressed: _i == 0 ? null : () => _go(_i - 1),
+                  icon: const Icon(Icons.arrow_back, size: 26),
+                ),
               ),
               const SizedBox(width: 8),
               if (step.optional)
@@ -471,6 +472,26 @@ class _GuidePageState extends State<GuidePage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _scene() {
+    if (_use3d && !_noGl) {
+      return StepScene3D(
+        steps: _steps,
+        index: _i,
+        automatic: r.caliber.type == WindType.automatic,
+        date: r.hasDate,
+        onNoGl: () {
+          if (mounted) setState(() => _noGl = true);
+        },
+      );
+    }
+    return StepScene(
+      steps: _steps,
+      index: _i,
+      automatic: r.caliber.type == WindType.automatic,
+      date: r.hasDate,
     );
   }
 
@@ -532,3 +553,30 @@ const _photoSteps = {
   'fondello', 'rotore', 'stelo', 'estrai', 'lancette', 'quadrante', 'calendario', 'minuteria', 'automatico',
   'bilanciere', 'ancora', 'carica', 'bariletto_out', 'treno_out', 'remontoir_out', 'antiurto_out', 'bariletto_apri',
 };
+
+/// Sezione a scomparsa: tiene la pagina corta, i dettagli si aprono quando servono.
+class _More extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+  const _More({super.key, required this.icon, required this.title, required this.children, this.initiallyExpanded = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          leading: Icon(icon, color: Brand.blu),
+          title: Text(title, style: Brand.sora(16, 700, color: Brand.inchiostro)),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ),
+    );
+  }
+}

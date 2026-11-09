@@ -94,7 +94,7 @@ class _IdentifyPageState extends State<IdentifyPage> {
             children: [
               for (final b in standardBph)
                 ChoiceChip(
-                  label: Text(formatBph(b), style: const TextStyle(fontSize: 12)),
+                  label: Text(formatBph(b), style: const TextStyle(fontSize: 14)),
                   selected: _bph == b,
                   onSelected: (s) => setState(() => _bph = s ? b : null),
                 ),
@@ -157,16 +157,21 @@ class _IdentifyPageState extends State<IdentifyPage> {
 
   Widget _label(String t) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Text(t, style: Brand.sora(14, 700, color: Brand.blu)),
+        child: Text(t, style: Brand.sora(16, 700, color: Brand.blu)),
       );
 
   Widget _chip(String t, bool sel, VoidCallback onTap) =>
-      ChoiceChip(label: Text(t), selected: sel, onSelected: (_) => onTap());
+      ChoiceChip(
+        label: Text(t, style: const TextStyle(fontSize: 16)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        selected: sel,
+        onSelected: (_) => onTap(),
+      );
 
   InputDecoration _dec(String hint) => InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Brand.tenue,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
       );
 }

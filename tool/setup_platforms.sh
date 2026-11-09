@@ -33,7 +33,16 @@ cat > android/app/proguard-rules.pro <<'PRO'
 -dontwarn com.google.mlkit.vision.text.devanagari.**
 -dontwarn com.google.mlkit.vision.text.japanese.**
 -dontwarn com.google.mlkit.vision.text.korean.**
+# ML Kit trova i suoi componenti per riflessione: R8 non deve toglierli o rinominarli
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.firebase.components.** { *; }
+-keep class com.google_mlkit_text_recognition.** { *; }
+-keep class com.google_mlkit_commons.** { *; }
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 PRO
+grep -q 'enableR8.fullMode' android/gradle.properties || echo 'android.enableR8.fullMode=false' >> android/gradle.properties
 if ! grep -q 'proguard-rules.pro' "$GRADLE"; then
   if [[ "$GRADLE" == *.kts ]]; then
     sed -i 's#signingConfig = signingConfigs.getByName("debug")#signingConfig = signingConfigs.getByName("debug")\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")#' "$GRADLE"

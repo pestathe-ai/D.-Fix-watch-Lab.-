@@ -130,7 +130,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             decoration: InputDecoration(
               labelText: 'Chiave API di Gemini',
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Brand.tenue,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
               suffixIcon: IconButton(
                 onPressed: () => setState(() => _show = !_show),
@@ -146,7 +146,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
               labelText: 'Modello',
               helperText: 'Lascia ${AiSettings.defaultModel} se non sai cosa mettere',
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Brand.tenue,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             ),
           ),
