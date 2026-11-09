@@ -172,7 +172,9 @@ Leggi le scritte incise (calibro, rubini/jewels, marca del movimento) e guarda l
 Rispondi SOLO con JSON:
 {"caliber_text": "testo del calibro letto o vuoto", "caliber_id": "uno degli id sotto oppure null",
  "name": "nome del calibro che riconosci anche se non è in elenco", "automatic": true/false/null,
- "jewels": numero o null, "confidence": numero da 0 a 1, "reason": "breve spiegazione in italiano"}
+ "jewels": numero o null, "bph": alternanze/ora o null, "has_date": true/false/null, "chrono": true/false,
+ "confidence": numero da 0 a 1, "reason": "breve spiegazione in italiano",
+ "tips": ["2-4 consigli pratici in italiano per smontare e rimontare QUESTO movimento (viti sinistrorse, pezzi delicati, particolarità)"]}
 Calibri noti (id: nome):
 $known
 ''');
@@ -226,8 +228,17 @@ List<CaliberGuess> geminiCaliberGuesses(Map<String, dynamic> j) {
   if (out.isEmpty) {
     final auto = j['automatic'];
     final name = (j['name'] as String?)?.trim();
-    final generic = caliberById(auto == false ? 'generic_manual' : 'generic_auto');
-    out.add(CaliberGuess(generic, conf * 0.6, [
+    final tips = ((j['tips'] as List?) ?? const []).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).take(5);
+    final cal = Caliber.unknown(
+      name: (name != null && name.isNotEmpty) ? name : (auto == false ? 'Movimento a carica manuale' : 'Movimento automatico'),
+      automatic: auto != false,
+      bph: (j['bph'] as num?)?.toInt(),
+      jewels: (j['jewels'] as num?)?.toInt(),
+      hasDate: (j['has_date'] as bool?) ?? true,
+      chrono: (j['chrono'] as bool?) ?? false,
+      notes: [for (final t in tips) 'Consiglio dell\'AI: $t'],
+    );
+    out.add(CaliberGuess(cal, conf * 0.6, [
       if (name != null && name.isNotEmpty) 'L\'AI pensa sia: $name (non è nel mio archivio)',
       if (reason != null && reason.isNotEmpty) reason,
     ], source: 'AI'));

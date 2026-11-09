@@ -108,6 +108,32 @@ void main() {
       expect(matchEngravings('VOSTOK 2416B 31 JEWELS').guesses.first.caliber.id, 'vostok2416');
       expect(matchEngravings('SWISS C07.111 23 JEWELS').guesses.first.caliber.id, 'powermatic80');
     });
+    test('marche poco note: Raketa, Yema, Citizen, Tissot', () {
+      expect(matchEngravings('RAKETA MADE IN USSR 19 JEWELS').guesses.first.caliber.id, 'raketa2609');
+      expect(matchEngravings('PAKETA 2609.HA').guesses.first.caliber.id, 'raketa2609');
+      expect(matchEngravings('YEMA').guesses, isNotEmpty);
+      expect(matchEngravings('CITIZEN 21 JEWELS').guesses.first.caliber.jewels, 21);
+      expect(matchEngravings('TISSOT SWISS POWERMATIC 80').guesses.first.caliber.id, 'powermatic80');
+      expect(matchEngravings('SLAVA 2427').guesses.first.caliber.id, 'slava2427');
+    });
+    test('ogni marca rimanda a calibri esistenti', () {
+      final ids = calibers.map((c) => c.id).toSet();
+      for (final e in brandCalibers.entries) {
+        for (final id in e.value) {
+          expect(ids, contains(id), reason: '${e.key} → $id');
+        }
+      }
+      expect(brandCalibers.length, greaterThan(120));
+      expect(calibers.length, greaterThan(100));
+    });
+    test('movimento sconosciuto resta nella revisione', () {
+      final c = Caliber.unknown(name: 'Calibro K58', automatic: false, hasDate: false);
+      final back = Caliber.fromJson(c.toJson());
+      expect(back.name, 'Calibro K58');
+      expect(back.type, WindType.manual);
+      expect(back.custom, isTrue);
+      expect(back.hasDate, isFalse);
+    });
     test('testo senza calibro: nessun candidato', () {
       expect(matchEngravings('SWISS MADE ADJUSTED').guesses, isEmpty);
     });
@@ -140,9 +166,18 @@ void main() {
       expect(g.first.source, 'AI');
     });
     test('calibro sconosciuto: sequenza universale', () {
-      final g = geminiCaliberGuesses({'caliber_id': null, 'name': 'Felsa 690', 'automatic': false, 'confidence': 0.7});
-      expect(g.first.caliber.id, 'generic_manual');
-      expect(g.first.why.first, contains('Felsa 690'));
+      final g = geminiCaliberGuesses({
+        'caliber_id': null,
+        'name': 'Kienzle 058',
+        'automatic': false,
+        'confidence': 0.7,
+        'tips': ['Il bilanciere ha un antiurto senza rubino.'],
+      });
+      expect(g.first.caliber.custom, isTrue);
+      expect(g.first.caliber.type, WindType.manual);
+      expect(g.first.caliber.name, 'Kienzle 058');
+      expect(g.first.caliber.notes.first, contains('antiurto'));
+      expect(g.first.why.first, contains('Kienzle 058'));
     });
     test('viti in box_2d', () {
       final j = parseGeminiJson(wrap({

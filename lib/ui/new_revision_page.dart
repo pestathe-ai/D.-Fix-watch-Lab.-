@@ -41,8 +41,13 @@ class _NewRevisionPageState extends State<NewRevisionPage> {
         _showList = false;
       });
 
+  String _codeName() {
+    final t = _code.text.trim();
+    return RegExp(r'\d').hasMatch(t) ? 'Calibro ${t.toUpperCase()}' : t;
+  }
+
   void _search(String t) {
-    setState(() => _typed = t.trim().length < 2 ? [] : matchEngravings(t).guesses.take(4).toList());
+    setState(() => _typed = t.trim().length < 2 ? [] : matchEngravings(t).guesses.take(6).toList());
   }
 
   Future<void> _photoPick() async {
@@ -60,7 +65,8 @@ class _NewRevisionPageState extends State<NewRevisionPage> {
     final r = Revision(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       watchName: name,
-      caliberId: _cal.id,
+      caliberId: _cal.custom ? (_cal.type == WindType.manual ? 'generic_manual' : 'generic_auto') : _cal.id,
+      custom: _cal.custom ? _cal : null,
       hasDate: _date,
       started: DateTime.now(),
     );
@@ -135,7 +141,12 @@ class _NewRevisionPageState extends State<NewRevisionPage> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(_cal.name, style: Brand.sora(18, 800, color: Brand.inchiostro)),
                       const SizedBox(height: 2),
-                      Text(_cal.generic ? 'Sequenza universale, va bene per quasi tutti' : _cal.summary,
+                      Text(
+                          _cal.custom
+                              ? '${_cal.summary} · non in archivio: sequenza universale'
+                              : _cal.generic
+                                  ? 'Sequenza universale, va bene per quasi tutti'
+                                  : _cal.summary,
                           style: const TextStyle(fontSize: 15)),
                     ]),
                   ),
@@ -172,7 +183,7 @@ class _NewRevisionPageState extends State<NewRevisionPage> {
                     const Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text('Scrivi il numero inciso', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                        Text('es. NH35, 2824, 6R15, 7S26', style: TextStyle(fontSize: 14.5, color: Color(0xFF4A6460))),
+                        Text('es. NH35, 2824, 2609, oppure la marca: Raketa, Yema…', style: TextStyle(fontSize: 14.5, color: Color(0xFF4A6460))),
                       ]),
                     ),
                   ]),
@@ -208,14 +219,33 @@ class _NewRevisionPageState extends State<NewRevisionPage> {
                         child: const Text('Questo'),
                       ),
                     ),
-                  if (_code.text.trim().length >= 2 && _typed.isEmpty)
+                  if (_code.text.trim().length >= 2 && _typed.every((g) => g.score < 0.7)) ...[
                     Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: 8, bottom: 8),
                       child: Text(
-                        'Non lo conosco ancora. Nessun problema: usa la sequenza universale qui sotto, va bene per quasi tutti.',
-                        style: TextStyle(fontSize: 15, color: Brand.inchiostro.withValues(alpha: 0.75)),
+                        _typed.isEmpty
+                            ? 'Non è nel mio archivio. Nessun problema: lo tengo col suo nome e ti guido con la sequenza '
+                                'universale, che va bene per quasi tutti i movimenti meccanici. Si carica:'
+                            : 'Se non è nessuno di questi, lo tengo col suo nome e uso la sequenza universale. Si carica:',
+                        style: TextStyle(fontSize: 15, height: 1.4, color: Brand.inchiostro.withValues(alpha: 0.8)),
                       ),
                     ),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _pick(Caliber.unknown(name: _codeName(), automatic: true)),
+                          child: const Text('Da solo'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _pick(Caliber.unknown(name: _codeName(), automatic: false)),
+                          child: const Text('A mano'),
+                        ),
+                      ),
+                    ]),
+                  ],
                 ]),
               ),
             ),

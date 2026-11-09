@@ -108,6 +108,8 @@ class Revision {
   final String id;
   String watchName;
   String caliberId;
+  /// Movimento non in archivio, salvato con la revisione.
+  Caliber? custom;
   bool hasDate;
   final DateTime started;
   final Set<String> done;
@@ -122,6 +124,7 @@ class Revision {
     required this.id,
     required this.watchName,
     required this.caliberId,
+    this.custom,
     required this.hasDate,
     required this.started,
     Set<String>? done,
@@ -148,7 +151,7 @@ class Revision {
     return '+';
   }
 
-  Caliber get caliber => caliberById(caliberId);
+  Caliber get caliber => custom ?? caliberById(caliberId);
 
   /// I passi che valgono per questo orologio.
   List<ServiceStep> get steps => stepsFor(caliber.type, hasDate);
@@ -166,6 +169,7 @@ class Revision {
         'id': id,
         'watchName': watchName,
         'caliberId': caliberId,
+        if (custom != null) 'custom': custom!.toJson(),
         'hasDate': hasDate,
         'started': started.toIso8601String(),
         'done': done.toList(),
@@ -181,6 +185,7 @@ class Revision {
         id: j['id'] as String,
         watchName: j['watchName'] as String,
         caliberId: j['caliberId'] as String,
+        custom: j['custom'] is Map ? Caliber.fromJson(Map<String, dynamic>.from(j['custom'] as Map)) : null,
         hasDate: (j['hasDate'] as bool?) ?? true,
         started: DateTime.parse(j['started'] as String),
         done: {...((j['done'] as List?) ?? const []).cast<String>()},
