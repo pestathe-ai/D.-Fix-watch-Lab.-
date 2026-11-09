@@ -2,6 +2,10 @@
 
 Guida passo passo alla revisione di orologi meccanici (automatici e a carica manuale), con la spiegazione di ogni pezzo.
 
+## Novità v0.6
+- **Immagini fotorealistiche di ogni passo** (27), calcolate con Blender su un movimento generico originale ("D. CAL. 01"): pezzo del passo evidenziato in arancio, viti numerate nell'ordine. Tocca per ingrandire.
+- **Video realistico dello scappamento** al rallentatore in "Come funziona".
+
 ## Novità v0.5
 - **Aspetto più realistico**: metalli fisici, righe di Ginevra con riflessi che cambiano girando il pezzo, perlage, viti azzurrate con riflessi viola, ombre morbide. Menu qualità alta/normale.
 - **Movimento vivo**: il bilanciere batte, l'ancora e la ruota di scappamento vanno a scatti, il treno gira a rapporti reali, le lancette segnano l'ora vera; tic-tac sincronizzato (pulsante audio). Si ferma da solo se manca un pezzo.
