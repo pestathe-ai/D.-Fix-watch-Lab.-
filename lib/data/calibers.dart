@@ -1704,6 +1704,32 @@ const List<Caliber> calibers = [
       'Calibro vintage: i ricambi sono rari, lavora con calma e fotografa ogni passaggio.',
     ],
   ),
+  Caliber(
+    id: 'fe233',
+    engravings: ['FE233', 'CUPILLARD', 'FRANCEEBAUCHES', 'FE140', 'FE68', 'LORSA', 'P75', 'FE', 'CUPILLARD233'],
+    name: 'Movimenti francesi France Ebauches (Cupillard 233, FE 140, Lorsa P75)',
+    type: WindType.manual,
+    jewels: 17,
+    hasDate: false,
+    notes: [
+      'Movimenti francesi di Besançon, montati da Yema, Lip, Herbelin e molte marche francesi tra anni 50 e 80.',
+      'Architettura classica: ruota del cricchetto e della corona a vista, ponte del treno e ponte del bilanciere separati.',
+      'Calibro vintage: i ricambi si trovano cercando il numero inciso sotto il bilanciere o sotto il quadrante.',
+    ],
+  ),
+  Caliber(
+    id: 'tongji',
+    engravings: ['TONGJI', 'SS7', 'SS7A', 'SZ1', 'SB18'],
+    name: 'Movimento cinese unificato "Tongji" (Shanghai, Tianjin…)',
+    type: WindType.manual,
+    bph: 21600,
+    jewels: 17,
+    hasDate: false,
+    notes: [
+      'Movimento standard cinese degli anni 70-90, prodotto da molte fabbriche con piccole differenze.',
+      'Robusto e semplice: buono per imparare.',
+    ],
+  ),
 ];
 
 Caliber caliberById(String id) =>

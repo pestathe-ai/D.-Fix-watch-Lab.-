@@ -136,6 +136,11 @@ void main() {
       expect(matchEngravings('MONDIA AS 1920').guesses.first.caliber.id, 'as1920');
       expect(matchEngravings('MONDIA').guesses, isNotEmpty);
     });
+    test('Yema vintage manuale 17 rubini → movimenti francesi FE', () {
+      final g = matchEngravings('YEMA\n17JEWELS').guesses;
+      expect(g.first.caliber.id, 'fe233');
+      expect(matchEngravings('CUPILLARD 233').guesses.first.caliber.id, 'fe233');
+    });
     test('ogni marca rimanda a calibri esistenti', () {
       final ids = calibers.map((c) => c.id).toSet();
       for (final e in brandCalibers.entries) {

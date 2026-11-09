@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -40,10 +41,12 @@ class _RecognizePageState extends State<RecognizePage> {
   List<CaliberGuess> _offline = [];
   List<CaliberGuess> _aiGuesses = [];
   final _clock = Stopwatch();
+  Timer? _tick;
   final _code = TextEditingController();
 
   @override
   void dispose() {
+    _tick?.cancel();
     _code.dispose();
     super.dispose();
   }
@@ -71,6 +74,15 @@ class _RecognizePageState extends State<RecognizePage> {
     _clock
       ..reset()
       ..start();
+    _tick?.cancel();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (!_busy && _ai != _Ai.running) {
+        _tick?.cancel();
+        return;
+      }
+      setState(() {});
+    });
     setState(() {
       _photo = x.path;
       _busy = true;
@@ -99,15 +111,17 @@ class _RecognizePageState extends State<RecognizePage> {
     try {
       final rec = TextRecognizer(script: TextRecognitionScript.latin);
       final texts = <String>[];
-      final first = await rec.processImage(InputImage.fromFilePath(path));
+      final first = await rec.processImage(InputImage.fromFilePath(path)).timeout(const Duration(seconds: 15));
       texts.add(first.text);
       // se non basta, rileggo la foto ruotata e con più contrasto
       if (matchEngravings(first.text).guesses.every((g) => g.score < 0.8)) {
         if (mounted && run == _run) setState(() => _status = 'Rileggo la foto girata e con più contrasto…');
         try {
           final dir = (await getTemporaryDirectory()).path;
-          for (final v in await ocrVariants(path, dir)) {
-            final r = await rec.processImage(InputImage.fromFilePath(v));
+          final budget = Stopwatch()..start();
+          for (final v in await ocrVariants(path, dir).timeout(const Duration(seconds: 20))) {
+            if (budget.elapsed > const Duration(seconds: 20)) break; // non faccio aspettare oltre
+            final r = await rec.processImage(InputImage.fromFilePath(v)).timeout(const Duration(seconds: 8));
             if (r.text.trim().isNotEmpty) texts.add(r.text);
             if (matchEngravings(texts.join('\n')).guesses.any((g) => g.score >= 0.85)) break;
           }
@@ -136,7 +150,10 @@ class _RecognizePageState extends State<RecognizePage> {
   Future<void> _askAi(String path, int run, AiSettings settings) async {
     setState(() => _ai = _Ai.running);
     try {
-      final g = await Gemini(settings).identify(path);
+      final g = await Gemini(settings).identify(path).timeout(
+            settings.timeout + const Duration(seconds: 20),
+            onTimeout: () => throw AiException('Gemini non ha risposto in tempo.', kind: AiFail.slow),
+          );
       if (!mounted || run != _run || _ai == _Ai.skipped) return;
       setState(() {
         _aiGuesses = g;
@@ -185,7 +202,7 @@ class _RecognizePageState extends State<RecognizePage> {
       _Ai.running => (
           Icons.auto_awesome,
           Brand.blu,
-          'L\'AI sta ancora controllando…',
+          'L\'AI sta ancora controllando… ${_clock.elapsed.inSeconds} s',
           'Intanto ecco cosa ho letto dalle scritte. La lista si aggiorna da sola quando risponde.'
         ),
       _Ai.ok => (
@@ -287,7 +304,7 @@ class _RecognizePageState extends State<RecognizePage> {
             Row(children: [
               const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
               const SizedBox(width: 12),
-              Expanded(child: Text(_status)),
+              Expanded(child: Text('$_status  ${_clock.elapsed.inSeconds} s')),
             ])
           else
             Row(children: [

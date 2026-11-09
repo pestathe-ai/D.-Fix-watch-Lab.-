@@ -59,8 +59,8 @@ Future<String?> discoverGeminiModel(String key) async {
   try {
     final req = await client.getUrl(Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200'));
     req.headers.set('x-goog-api-key', key);
-    final res = await req.close().timeout(const Duration(seconds: 30));
-    final txt = await res.transform(utf8.decoder).join();
+    final res = await req.close().timeout(const Duration(seconds: 20));
+    final txt = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) return null;
     return pickGeminiModel(jsonDecode(txt) as Map<String, dynamic>);
   } catch (_) {
@@ -134,7 +134,7 @@ class Gemini {
         req.headers.set('x-goog-api-key', s.key);
         req.add(utf8.encode(payload));
         final res = await req.close().timeout(timeout ?? s.timeout);
-        final txt = await res.transform(utf8.decoder).join();
+        final txt = await res.transform(utf8.decoder).join().timeout(timeout ?? s.timeout);
         if ((res.statusCode == 503 || res.statusCode == 500) && attempt == 0) {
           await Future<void>.delayed(const Duration(seconds: 2));
           model = 'gemini-flash-lite-latest';
