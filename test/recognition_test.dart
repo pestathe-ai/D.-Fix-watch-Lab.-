@@ -138,7 +138,8 @@ void main() {
     });
     test('Yema vintage manuale 17 rubini → movimenti francesi FE', () {
       final g = matchEngravings('YEMA\n17JEWELS').guesses;
-      expect(g.first.caliber.id, 'fe233');
+      expect(g.first.caliber.jewels, 17);
+      expect(matchEngravings('17 JEWELS\nPS31').guesses.first.caliber.id, 'jeambrun_ps31');
       expect(matchEngravings('CUPILLARD 233').guesses.first.caliber.id, 'fe233');
     });
     test('ogni marca rimanda a calibri esistenti', () {

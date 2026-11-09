@@ -1730,6 +1730,23 @@ const List<Caliber> calibers = [
       'Robusto e semplice: buono per imparare.',
     ],
   ),
+  Caliber(
+    id: 'jeambrun_ps31',
+    engravings: ['PS31', 'PS31A', 'PS32', 'PS32A', 'PS32C', 'PS33C', 'JEAMBRUN', 'JEJ'],
+    name: 'Jeambrun PS31 / PS32 (francese)',
+    type: WindType.manual,
+    bph: 18000,
+    jewels: 17,
+    reserve: '~43 h',
+    diameterMm: 23.7,
+    hasDate: false,
+    notes: [
+      'Movimento francese Jeambrun (marchio JEJ), anni 60: montato da marche francesi come Yema.',
+      'Secondi piccoli: la ruota dei secondi è fuori centro, la lancetta va sul suo perno a parte.',
+      'Il PS31 A ha una piastrina che copre la ruota del cricchetto al posto della vite: togli prima la piastrina.',
+      'PS32 è la versione più grande (11½ linee); PS32C ha la data, PS33C giorno e data.',
+    ],
+  ),
 ];
 
 Caliber caliberById(String id) =>
