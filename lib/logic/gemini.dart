@@ -11,7 +11,12 @@ import 'screw_detector.dart';
 class AiSettings {
   static const _kKey = 'gemini_key';
   static const _kModel = 'gemini_model';
-  static const defaultModel = 'gemini-2.5-flash';
+  /// Alias di Google che punta sempre all'ultimo Flash: non "scade" quando escono modelli nuovi.
+  static const defaultModel = 'gemini-flash-latest';
+
+  /// Modelli spenti o in uscita: chi li aveva salvati passa in automatico al predefinito.
+  static bool isRetired(String m) =>
+      RegExp(r'^gemini-(1\.|2\.0|2\.5-(flash|pro)$|2\.5-flash-preview|3-pro-preview|3\.1-flash-lite-preview)').hasMatch(m);
 
   final String key;
   final String model;
@@ -21,7 +26,9 @@ class AiSettings {
 
   static Future<AiSettings> load() async {
     final p = await SharedPreferences.getInstance();
-    return AiSettings(p.getString(_kKey) ?? '', p.getString(_kModel) ?? defaultModel);
+    var m = p.getString(_kModel) ?? defaultModel;
+    if (m.trim().isEmpty || isRetired(m.trim())) m = defaultModel;
+    return AiSettings(p.getString(_kKey) ?? '', m.trim());
   }
 
   static Future<void> save(String key, String model) async {
@@ -29,6 +36,51 @@ class AiSettings {
     await p.setString(_kKey, key.trim());
     await p.setString(_kModel, model.trim().isEmpty ? defaultModel : model.trim());
   }
+}
+
+/// Sceglie da solo un modello Flash che c'è davvero, chiedendo a Google l'elenco.
+Future<String?> discoverGeminiModel(String key) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+  try {
+    final req = await client.getUrl(Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200'));
+    req.headers.set('x-goog-api-key', key);
+    final res = await req.close().timeout(const Duration(seconds: 30));
+    final txt = await res.transform(utf8.decoder).join();
+    if (res.statusCode != 200) return null;
+    return pickGeminiModel(jsonDecode(txt) as Map<String, dynamic>);
+  } catch (_) {
+    return null;
+  } finally {
+    client.close();
+  }
+}
+
+/// Dall'elenco dei modelli: il Flash più recente che sa rispondere a testo e immagini.
+String? pickGeminiModel(Map<String, dynamic> list) {
+  final names = <String>[];
+  for (final e in (list['models'] as List? ?? const [])) {
+    final m = Map<String, dynamic>.from(e as Map);
+    final methods = (m['supportedGenerationMethods'] as List?)?.cast<String>() ?? const [];
+    if (!methods.contains('generateContent')) continue;
+    final n = (m['name'] as String? ?? '').replaceFirst('models/', '');
+    if (!n.startsWith('gemini')) continue;
+    if (RegExp(r'tts|image|live|audio|embed|transcribe|robotics|computer|translate|exp').hasMatch(n)) continue;
+    names.add(n);
+  }
+  if (names.contains(AiSettings.defaultModel)) return AiSettings.defaultModel;
+  double ver(String n) => double.tryParse(RegExp(r'gemini-(\d+(\.\d+)?)').firstMatch(n)?.group(1) ?? '') ?? 0;
+  int rank(String n) {
+    var r = 0;
+    if (n.contains('flash') && !n.contains('lite')) r += 4;
+    if (n.contains('lite')) r += 2;
+    if (!n.contains('preview')) r += 1;
+    return r;
+  }
+  names.sort((a, b) {
+    final c = rank(b).compareTo(rank(a));
+    return c != 0 ? c : ver(b).compareTo(ver(a));
+  });
+  return names.isEmpty ? null : names.first;
 }
 
 class AiException implements Exception {
@@ -49,6 +101,35 @@ class Gemini {
   final AiSettings s;
   const Gemini(this.s);
 
+  /// Manda la richiesta; se il modello non esiste più ne sceglie un altro da solo e riprova.
+  static Future<(int, String, String)> post(AiSettings s, String body) async {
+    var model = s.model;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+      try {
+        final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
+        final req = await client.postUrl(uri);
+        req.headers.contentType = ContentType.json;
+        req.headers.set('x-goog-api-key', s.key);
+        req.add(utf8.encode(body));
+        final res = await req.close().timeout(const Duration(seconds: 90));
+        final txt = await res.transform(utf8.decoder).join();
+        if (res.statusCode == 404 && attempt == 0) {
+          final other = await discoverGeminiModel(s.key);
+          if (other != null && other != model) {
+            model = other;
+            await AiSettings.save(s.key, other);
+            continue;
+          }
+        }
+        return (res.statusCode, txt, model);
+      } finally {
+        client.close();
+      }
+    }
+    return (404, '', model);
+  }
+
   Future<Map<String, dynamic>> _ask(String imagePath, String prompt) async {
     final bytes = await File(imagePath).readAsBytes();
     final body = jsonEncode({
@@ -64,15 +145,9 @@ class Gemini {
       ],
       'generationConfig': {'response_mime_type': 'application/json', 'temperature': 0.2},
     });
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
     try {
-      final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent');
-      final req = await client.postUrl(uri);
-      req.headers.contentType = ContentType.json;
-      req.headers.set('x-goog-api-key', s.key);
-      req.add(utf8.encode(body));
-      final res = await req.close().timeout(const Duration(seconds: 90));
-      final txt = await res.transform(utf8.decoder).join();
+      final (code, txt, model) = await post(s, body);
+      final res = (statusCode: code);
       if (res.statusCode == 429) {
         throw const AiException('Limite gratuito di Gemini raggiunto per ora. Riprova tra qualche minuto (intanto uso il riconoscimento offline).');
       }
@@ -80,14 +155,12 @@ class Gemini {
         throw AiException('Gemini ha rifiutato la richiesta (codice ${res.statusCode}): controlla la chiave e il nome del modello nelle impostazioni.');
       }
       if (res.statusCode == 404) {
-        throw AiException('Il modello "${s.model}" non esiste più: scegline un altro nelle impostazioni.');
+        throw AiException('Il modello "$model" non risponde e non ne ho trovato un altro: riprova più tardi.');
       }
       if (res.statusCode != 200) throw AiException('Errore di Gemini (${res.statusCode}).');
       return parseGeminiJson(txt);
     } on SocketException {
       throw const AiException('Niente connessione a internet: uso il riconoscimento offline.');
-    } finally {
-      client.close();
     }
   }
 

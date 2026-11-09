@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,28 +54,22 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _result = null;
     });
     final s = await AiSettings.load();
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
     try {
-      final req = await client.postUrl(
-          Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent'));
-      req.headers.contentType = ContentType.json;
-      req.headers.set('x-goog-api-key', s.key);
-      req.write('{"contents":[{"parts":[{"text":"Rispondi solo: ok"}]}]}');
-      final res = await req.close().timeout(const Duration(seconds: 40));
-      await res.drain<void>();
-      _ok = res.statusCode == 200;
-      _result = switch (res.statusCode) {
-        200 => 'Funziona! L\'AI verrà usata nel riconoscimento.',
+      final (code, _, model) = await Gemini.post(s, '{"contents":[{"parts":[{"text":"Rispondi solo: ok"}]}]}');
+      _ok = code == 200;
+      if (model != s.model) _model.text = model;
+      _result = switch (code) {
+        200 => model != s.model
+            ? 'Funziona! Il modello di prima non esiste più, ho scelto io "$model".'
+            : 'Funziona! L\'AI verrà usata nel riconoscimento (modello "$model").',
         429 => 'La chiave è valida ma hai raggiunto il limite gratuito per ora. Riprova più tardi.',
-        400 || 401 || 403 => 'Chiave non valida (codice ${res.statusCode}). Ricontrollala.',
-        404 => 'Il modello "${s.model}" non esiste: prova "${AiSettings.defaultModel}" o un modello Flash più recente.',
-        _ => 'Errore ${res.statusCode}.',
+        400 || 401 || 403 => 'Chiave non valida (codice $code). Ricontrollala: deve iniziare con "AIza" o "AQ.".',
+        404 => 'Non trovo un modello disponibile per questa chiave. Riprova più tardi.',
+        _ => 'Errore $code.',
       };
     } catch (e) {
       _ok = false;
-      _result = 'Nessuna risposta: controlla la connessione ($e).';
-    } finally {
-      client.close();
+      _result = 'Nessuna risposta: controlla la connessione a internet.';
     }
     if (mounted) setState(() => _testing = false);
   }
@@ -139,16 +132,28 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             ),
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _model,
-            autocorrect: false,
-            decoration: InputDecoration(
-              labelText: 'Modello',
-              helperText: 'Lascia ${AiSettings.defaultModel} se non sai cosa mettere',
-              filled: true,
-              fillColor: Brand.tenue,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-            ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Avanzate: modello', style: TextStyle(fontSize: 15)),
+            children: [
+              TextField(
+                controller: _model,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'Modello',
+                  helperText: 'Lascia "${AiSettings.defaultModel}": se un modello sparisce, l\'app ne sceglie un altro da sola',
+                  helperMaxLines: 2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => setState(() => _model.text = AiSettings.defaultModel),
+                  child: const Text('Rimetti quello consigliato'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Row(children: [

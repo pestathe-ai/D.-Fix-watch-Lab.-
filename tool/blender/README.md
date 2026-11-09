@@ -4,3 +4,6 @@ Script Blender (modulo `bpy` 5.x + `shapely` + `pillow`) usati per le immagini i
 
 - `steps.py OUT 1024 768 64` – un'immagine per ogni passo (legge passi, operazioni e viti dal codice Dart).
 - `escape_video.py OUT 48 640 480 32` – fotogrammi del video dello scappamento.
+
+## Foto dei pezzi
+`python parts.py OUT 640 480 24` → una foto per pezzo; convertire in WebP in `assets/renders/parts/`.

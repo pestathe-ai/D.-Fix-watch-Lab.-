@@ -10,13 +10,12 @@ import '../data/steps.dart';
 import '../logic/beat_analyzer.dart';
 import '../logic/revision.dart';
 import '../logic/store.dart';
-import 'glossary_page.dart';
 import 'measure_page.dart';
 import 'how_it_works_page.dart';
 import 'photo_marks.dart';
-import 'render_card.dart';
 import 'scene3d.dart';
 import 'scene_widgets.dart';
+import 'step_media.dart';
 import 'step_timer.dart';
 import 'theme.dart';
 
@@ -274,44 +273,71 @@ class _GuidePageState extends State<GuidePage> {
             ),
           ],
           const SizedBox(height: 14),
-          // 1. l'immagine: foto realistica se c'è, altrimenti la scena 3D/2D
-          if (renderSteps.contains(step.id))
-            RenderCard(stepId: step.id, title: step.title, hasScrews: step.todo.any((t) => t.toLowerCase().contains('vit')))
-          else
-            _scene(),
-          const SizedBox(height: 14),
-          // 2. cosa fare: a numeri grandi, una cosa per riga
-          for (var k = 0; k < step.todo.length; k++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(color: Brand.blu, shape: BoxShape.circle),
-                    child: Text('${k + 1}', style: Brand.sora(15, 800, color: Colors.white)),
+          // un solo riquadro: 3D → foto del passo → foto dei pezzi, e sotto cosa fare e perché
+          StepMediaCard(
+            key: ValueKey('media-${step.id}'),
+            step: step,
+            scene: _scene(),
+            sceneLabel: _use3d && !_noGl ? 'Video 3D' : 'Animazione',
+            parts: stepParts,
+            instructions: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Cosa fare', style: Brand.sora(17, 800, color: Brand.inchiostro)),
+              const SizedBox(height: 10),
+              for (var k = 0; k < step.todo.length; k++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(color: Brand.blu, shape: BoxShape.circle),
+                        child: Text('${k + 1}', style: Brand.sora(15, 800, color: Colors.white)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(step.todo[k], style: const TextStyle(fontSize: 18, height: 1.45, color: Brand.inchiostro)),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Text(step.todo[k], style: const TextStyle(fontSize: 18, height: 1.45, color: Brand.inchiostro)),
-                    ),
-                  ),
-                ],
+                ),
+              if (step.warning != null) ...[
+                const SizedBox(height: 4),
+                InfoBox(icon: Icons.warning_amber_rounded, title: 'Attenzione', text: step.warning!, color: Colors.red.shade700),
+              ],
+              if (step.lube != null) ...[
+                const SizedBox(height: 10),
+                InfoBox(icon: Icons.water_drop_outlined, title: 'Olio', text: step.lube!, color: Brand.arancio),
+              ],
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: ValueKey('why-${step.id}'),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 8),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+                  leading: const Icon(Icons.lightbulb_outline, color: Brand.blu),
+                  title: Text('Perché si fa', style: Brand.sora(16, 700, color: Brand.inchiostro)),
+                  children: [
+                    Text(step.why, style: const TextStyle(fontSize: 16.5, height: 1.45)),
+                    if (_howTab(step.id) != null) ...[
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => openHowItWorks(context, tab: _howTab(step.id)!.$1),
+                        icon: const Icon(Icons.play_circle_outline),
+                        label: Text('Animazione: ${_howTab(step.id)!.$2}'),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          if (step.warning != null) ...[
-            const SizedBox(height: 4),
-            InfoBox(icon: Icons.warning_amber_rounded, title: 'Attenzione', text: step.warning!, color: Colors.red.shade700),
-          ],
-          if (step.lube != null) ...[
-            const SizedBox(height: 10),
-            InfoBox(icon: Icons.water_drop_outlined, title: 'Olio', text: step.lube!, color: Brand.arancio),
-          ],
+            ]),
+          ),
           if (step.timerSeconds != null) ...[
             const SizedBox(height: 12),
             StepTimer(key: ValueKey(step.id), seconds: step.timerSeconds!),
@@ -350,41 +376,6 @@ class _GuidePageState extends State<GuidePage> {
           ],
           const SizedBox(height: 16),
           // 4. tutto il resto, chiuso finché non serve
-          _More(
-            key: ValueKey('more1-${step.id}'),
-            icon: Icons.lightbulb_outline,
-            title: 'Perché si fa',
-            children: [
-              Text(step.why, style: const TextStyle(fontSize: 16.5, height: 1.45)),
-              if (_howTab(step.id) != null) ...[
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () => openHowItWorks(context, tab: _howTab(step.id)!.$1),
-                  icon: const Icon(Icons.play_circle_outline),
-                  label: Text('Animazione: ${_howTab(step.id)!.$2}'),
-                ),
-              ],
-            ],
-          ),
-          if (stepParts.isNotEmpty)
-            _More(
-            key: ValueKey('more2-${step.id}'),
-              icon: Icons.settings_outlined,
-              title: 'I pezzi di questo passo (${stepParts.length})',
-              children: [
-                for (final p in stepParts) ...[
-                  PartCard(key: ValueKey('${step.id}-${p.id}'), part: p),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          if (renderSteps.contains(step.id))
-            _More(
-            key: ValueKey('more3-${step.id}'),
-              icon: Icons.view_in_ar_outlined,
-              title: 'Vista ${_use3d && !_noGl ? '3D' : 'animata'} da girare',
-              children: [_scene()],
-            ),
           _More(
             key: ValueKey('more4-${step.id}'),
             icon: Icons.photo_camera_outlined,

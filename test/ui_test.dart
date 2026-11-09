@@ -136,5 +136,11 @@ void main() {
     await _settle(t);
     expect(find.text('Perché si fa'), findsOneWidget);
     if (_shots) await _shot(t, '5_passo');
+    await t.tap(find.text('Foto').first);
+    await _settle(t);
+    if (_shots) await _shot(t, '6_passo_foto');
+    await t.tap(find.byTooltip('Immagine successiva'));
+    await _settle(t);
+    if (_shots) await _shot(t, '7_passo_pezzo');
   });
 }

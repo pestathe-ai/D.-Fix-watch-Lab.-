@@ -1,7 +1,7 @@
 name: d_fix_watch_lab
 description: "D. Fix Watch Lab – guida passo passo alla revisione di orologi meccanici."
 publish_to: 'none'
-version: 0.7.0+7
+version: 0.8.0+8
 
 environment:
   sdk: ^3.6.0
@@ -27,6 +27,7 @@ flutter:
   assets:
     - assets/web3d/
     - assets/renders/
+    - assets/renders/parts/
   fonts:
     - family: Sora
       fonts:
