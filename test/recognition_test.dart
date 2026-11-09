@@ -116,6 +116,16 @@ void main() {
       expect(matchEngravings('TISSOT SWISS POWERMATIC 80').guesses.first.caliber.id, 'powermatic80');
       expect(matchEngravings('SLAVA 2427').guesses.first.caliber.id, 'slava2427');
     });
+    test('Omega vintage, Zenith, Bulova, Mondia', () {
+      expect(matchEngravings('OMEGA 565 24 JEWELS').guesses.first.caliber.id, 'omega56x');
+      expect(matchEngravings('OMEGA WATCH CO 620').guesses.first.caliber.id, 'omega601');
+      expect(matchEngravings('OMEGA 1020').guesses.first.caliber.id, 'omega1012');
+      expect(matchEngravings('OMEGA 684').guesses.first.caliber.id, 'omega66x');
+      expect(matchEngravings('ZENITH 2552PC').guesses.first.caliber.id, 'zenith2552');
+      expect(matchEngravings('BULOVA 11ANACD').guesses.first.caliber.id, 'bulova11a');
+      expect(matchEngravings('MONDIA AS 1920').guesses.first.caliber.id, 'as1920');
+      expect(matchEngravings('MONDIA').guesses, isNotEmpty);
+    });
     test('ogni marca rimanda a calibri esistenti', () {
       final ids = calibers.map((c) => c.id).toSet();
       for (final e in brandCalibers.entries) {
