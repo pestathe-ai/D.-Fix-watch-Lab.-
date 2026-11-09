@@ -140,9 +140,9 @@ void main() {
       expect(g.first.source, 'AI');
     });
     test('calibro sconosciuto: sequenza universale', () {
-      final g = geminiCaliberGuesses({'caliber_id': null, 'name': 'Peseux 7001', 'automatic': false, 'confidence': 0.7});
+      final g = geminiCaliberGuesses({'caliber_id': null, 'name': 'Felsa 690', 'automatic': false, 'confidence': 0.7});
       expect(g.first.caliber.id, 'generic_manual');
-      expect(g.first.why.first, contains('Peseux 7001'));
+      expect(g.first.why.first, contains('Felsa 690'));
     });
     test('viti in box_2d', () {
       final j = parseGeminiJson(wrap({
