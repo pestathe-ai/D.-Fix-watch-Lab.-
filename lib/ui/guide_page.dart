@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../art/actions.dart' show useProfile;
+import '../art/profiles.dart';
 import '../data/calibers.dart';
 import '../data/components.dart';
 import '../data/steps.dart';
@@ -45,6 +47,9 @@ class _GuidePageState extends State<GuidePage> {
   @override
   void initState() {
     super.initState();
+    // calibro con profilo fedele: forme e viti vere nel 3D
+    final pid = r.caliber.profileId;
+    useProfile(pid == null ? null : movementProfiles[pid]);
     _notes.text = r.notes[s.id] ?? '';
     SharedPreferences.getInstance().then((p) {
       if (mounted) {
@@ -64,6 +69,7 @@ class _GuidePageState extends State<GuidePage> {
 
   @override
   void dispose() {
+    useProfile(null);
     _scroll.dispose();
     _notes.dispose();
     super.dispose();

@@ -1,3 +1,4 @@
+import '../art/profiles.dart' show caliberProfile;
 import '../logic/beat_analyzer.dart';
 
 enum WindType { automatic, manual }
@@ -36,6 +37,9 @@ class Caliber {
     this.chrono = false,
     this.smallSec = false,
   });
+
+  /// Profilo 3D fedele, se il calibro ce l'ha (ricalcato dalle foto).
+  String? get profileId => caliberProfile[id];
 
   /// Secondi piccoli: dal calibro o dall'elenco dei calibri noti.
   bool get smallSeconds => smallSec || _smallSecondsIds.contains(id);
@@ -956,10 +960,9 @@ const List<Caliber> calibers = [
   Caliber(
     id: 'raketa2609',
     engravings: ['2609', '2609HA', '2609H'],
-    name: 'Raketa 2609.HA',
+    name: 'Raketa 2609.HA (16 o 19 rubini)',
     type: WindType.manual,
     bph: 18000,
-    jewels: 19,
     reserve: '~40 h',
     diameterMm: 26.0,
     hasDate: false,
@@ -1701,8 +1704,8 @@ const List<Caliber> calibers = [
   ),
   Caliber(
     id: 'omega66x',
-    engravings: ['660', '661', '670', '671', '672', '680', '681', '682', '683', '684', '685'],
-    name: 'Omega 660 – 685 automatici sottili (De Ville, Constellation)',
+    engravings: ['663', '660', '661', '662', '664', '670', '671', '672', '680', '681', '682', '683', '684', '685'],
+    name: 'Omega 660 – 685 automatici sottili (663, De Ville, Constellation)',
     type: WindType.automatic,
     notes: [
       'Calibro vintage: i ricambi sono rari, lavora con calma e fotografa ogni passaggio.',

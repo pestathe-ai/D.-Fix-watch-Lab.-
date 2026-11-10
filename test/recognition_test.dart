@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:d_fix_watch_lab/art/actions.dart';
+import 'package:d_fix_watch_lab/art/profiles.dart';
 import 'package:d_fix_watch_lab/data/calibers.dart';
 import 'package:d_fix_watch_lab/data/steps.dart';
 import 'package:d_fix_watch_lab/logic/caliber_match.dart';
@@ -152,6 +154,25 @@ void main() {
       expect(ps31.photosUrl.toString(), contains('Jeambrun'));
       final c = Caliber.fromJson(Caliber.unknown(name: 'X', automatic: false).toJson());
       expect(c.smallSeconds, isFalse);
+    });
+    test('rubini in cirillico e nuovi Omega', () {
+      expect(matchEngravings('16 KAMHEN 2609').jewels, 16);
+      expect(matchEngravings('16 KAMHEN 2609').guesses.first.caliber.id, 'raketa2609');
+      expect(matchEngravings('OMEGA 650 SEVENTEEN 17 JEWELS').guesses.first.caliber.id, 'omega650');
+      expect(matchEngravings('OMEGA 663').guesses.first.caliber.id, 'omega66x');
+    });
+    test('profili 3D fedeli: ogni calibro collegato ha il suo profilo e viti', () {
+      for (final e in caliberProfile.entries) {
+        expect(movementProfiles.containsKey(e.value), isTrue, reason: e.key);
+        expect(calibers.any((c) => c.id == e.key), isTrue, reason: e.key);
+      }
+      for (final p in movementProfiles.values) {
+        expect(p.screws, isNotEmpty, reason: p.id);
+        useProfile(p);
+        expect(screwDefs.map((s) => s.id).toSet().length, screwDefs.length, reason: 'viti doppie in ${p.id}');
+      }
+      useProfile(null);
+      expect(screwDefs, same(baseScrewDefs));
     });
     test('ogni marca rimanda a calibri esistenti', () {
       final ids = calibers.map((c) => c.id).toSet();

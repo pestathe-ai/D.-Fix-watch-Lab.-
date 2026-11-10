@@ -33,7 +33,7 @@ const _jewelWords = {
 const brandCalibers = <String, List<String>>{
   'ROLEX': ['rolex3135', 'rolex3235', 'rolex3130', 'rolex3230', 'rolex3035', 'rolex1570', 'rolex2235', 'rolex4130'],
   'TUDOR': ['tudormt56', 'eta2824', 'eta2892', 'valjoux7750'],
-  'OMEGA': ['omega56x', 'omega55x', 'omega1012', 'omega30t2', 'omega601', 'omega66x', 'omega33x', 'omega47x', 'omega75x', 'omega1481', 'omega1040', 'omega8500', 'omega8800', 'omega1861', 'omega2500', 'omega1120', 'omega321'],
+  'OMEGA': ['omega56x', 'omega650', 'omega55x', 'omega1012', 'omega30t2', 'omega601', 'omega66x', 'omega33x', 'omega47x', 'omega75x', 'omega1481', 'omega1040', 'omega8500', 'omega8800', 'omega1861', 'omega2500', 'omega1120', 'omega321'],
   'TISSOT': ['powermatic80', 'eta2824', 'eta2836', 'eta2834', 'eta6497', 'eta2783', 'as1700'],
   'HAMILTON': ['powermatic80', 'eta2824', 'eta6497', 'valjoux7750', 'eta2892'],
   'MIDO': ['powermatic80', 'eta2824', 'eta2836'],
@@ -254,7 +254,8 @@ EngravingInfo matchEngravings(String rawText) {
 
   // rubini: "25 JEWELS", "25 J", "XXV JEWELS", "25 RUBIS", "25 STEINE"
   int? jewels;
-  final jm = RegExp(r'(\d{2})\s*(JEWELS?|JEWEL|RUBIS|RUBINS?|STEINE|STONES|J\b)').firstMatch(text);
+  // КАМНЕЙ (rubini in russo) letto con caratteri latini: KAMHEN, KAMHEИ, KAMHEЙ, KAMHEI
+  final jm = RegExp(r'(\d{2})\s*(JEWELS?|JEWEL|RUBIS|RUBINS?|STEINE|STONES|KAMHE\S*|КАМНЕ\S*|J\b)').firstMatch(text);
   if (jm != null) jewels = int.tryParse(jm.group(1)!);
   if (jewels == null) {
     final rm = RegExp(r'\b(X{1,3}(?:IX|IV|V?I{0,3}))\s*(JEWELS?|RUBIS|RUBINS?|STEINE)').firstMatch(text);

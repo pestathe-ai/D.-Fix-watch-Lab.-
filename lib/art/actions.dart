@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/components.dart';
 import '../data/steps.dart';
 import 'scene.dart';
+import 'profiles.dart';
 import 'scene_steps.dart';
 
 /// Una vite della scena: appartiene a un pezzo (ponte, placca...).
@@ -18,7 +19,7 @@ class ScrewDef {
   Map<String, dynamic> toJson() => {'id': id, 'item': item, 'x': at.dx, 'y': at.dy, 'r': r, 'lh': leftHand};
 }
 
-const List<ScrewDef> screwDefs = [
+const List<ScrewDef> baseScrewDefs = [
   // cassa: staffe di fissaggio del movimento
   ScrewDef('v_cassa_1', 'p_cassa', Offset(164, 193), 13),
   ScrewDef('v_cassa_2', 'p_cassa', Offset(833, 810), 13),
@@ -50,6 +51,38 @@ const List<ScrewDef> screwDefs = [
   ScrewDef('v_molla_tiretto_2', 'molla_tiretto', Offset(770, 620), 11),
   ScrewDef('v_tiretto', 'tiretto', Geo.settingLeverPivot, 11),
 ];
+
+/// Viti in uso: quelle dello schema, o quelle del calibro se ha un profilo fedele.
+List<ScrewDef> screwDefs = baseScrewDefs;
+MovementProfile? activeProfile;
+
+/// Attiva il profilo di un calibro (o lo schema generico con null): cambia le viti del lato ponti.
+void useProfile(MovementProfile? p) {
+  activeProfile = p;
+  if (p == null) {
+    screwDefs = baseScrewDefs;
+    return;
+  }
+  final own = p.screws;
+  final mine = own.map((s) => s.item).toSet();
+  if (p.data['merged'] == true) mine.add('ponte_treno');
+  final g = Map<String, dynamic>.from(p.data['g'] as Map);
+  Offset pt(String k, Offset def) {
+    final v = g[k] as List?;
+    return v == null ? def : Offset((v[0] as num).toDouble(), (v[1] as num).toDouble());
+  }
+  final moved = <ScrewDef>[
+    for (final s in baseScrewDefs)
+      if (!mine.contains(s.item))
+        switch (s.id) {
+          'v_ruota_carica' => ScrewDef(s.id, s.item, pt('crownWheel', s.at), s.r, leftHand: s.leftHand),
+          'v_rocchetto' => ScrewDef(s.id, s.item, pt('barrel', s.at), s.r),
+          'v_cricchetto' => ScrewDef(s.id, s.item, pt('click', s.at), s.r),
+          _ => s,
+        },
+  ];
+  screwDefs = [...moved, ...own];
+}
 
 List<ScrewDef> screwsOf(String item) => screwDefs.where((s) => s.item == item).toList();
 

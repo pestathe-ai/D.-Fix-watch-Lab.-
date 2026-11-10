@@ -274,9 +274,29 @@ const G = {
   slPivot: [820, 405], yokePivot: [790, 610], clutch: [885, 500], windingPinion: [935, 500],
   settingWheel: [860, 572], minuteWheel: [425, 580], dateWheel: [380, 410], jumper: [620, 300],
 };
-G.forkTip = [G.pallet[0] + (G.balance[0] - G.pallet[0]) * 0.62, G.pallet[1] + (G.balance[1] - G.pallet[1]) * 0.62];
-G.entry = polar(G.escape, 52, -2.2);
-G.exit = polar(G.escape, 52, 0.55);
+const G0 = JSON.parse(JSON.stringify(G));
+function deriveG() {
+  G.forkTip = [G.pallet[0] + (G.balance[0] - G.pallet[0]) * 0.62, G.pallet[1] + (G.balance[1] - G.pallet[1]) * 0.62];
+  const a = Math.atan2(G.pallet[1] - G.escape[1], G.pallet[0] - G.escape[0]);
+  G.entry = polar(G.escape, 52, a - 1.7364);
+  G.exit = polar(G.escape, 52, a + 1.0136);
+}
+deriveG();
+
+/// Profilo del calibro (forme vere dei ponti, posizioni di ruote e viti). null = schema generico.
+let PROFILE = null;
+const PB = (id) => (PROFILE && PROFILE.bridges && PROFILE.bridges[id]) || null;
+const PH = (id, def) => {
+  if (!PROFILE || !PROFILE.screws) return def;
+  return PROFILE.screws[id] || [];
+};
+const PR = (key, def) => (PROFILE && PROFILE.radii && PROFILE.radii[key]) || def;
+function applyProfile(p) {
+  PROFILE = p && p.id ? p : null;
+  for (const k of Object.keys(G0)) G[k] = G0[k].slice();
+  if (PROFILE && PROFILE.g) for (const [k, v] of Object.entries(PROFILE.g)) G[k] = v.slice();
+  deriveG();
+}
 
 const STEM_Y = -3.9;
 
@@ -310,12 +330,12 @@ function build(mv) {
   }
   // ===== treno
   mv.add(addItem('ruota_centro', 'ruota_centro', (() => {
-    const g = trainWheel(G.center, 115, 80, 1.0, 18, 1.45);
+    const g = trainWheel(G.center, PR('center', 115), 80, 1.0, 18, 1.45);
     g.add(mesh(cyl(0.35, -8.2, 0, 12), MAT.steel()));
     return g;
   })()));
-  mv.add(addItem('ruota_terzo', 'ruota_terzo', trainWheel(G.third, 85, 75, 2.0, 14, 0.6)));
-  mv.add(addItem('ruota_secondi', 'ruota_secondi', trainWheel(G.fourth, 72, 70, 3.0, 12, 1.0)));
+  mv.add(addItem('ruota_terzo', 'ruota_terzo', trainWheel(G.third, PR('third', 85), 75, 2.0, 14, 0.6)));
+  mv.add(addItem('ruota_secondi', 'ruota_secondi', trainWheel(G.fourth, PR('fourth', 72), 70, 3.0, 12, 1.0)));
   mv.add(addItem('ruota_scappamento', 'ruota_scappamento', (() => {
     const g = groupAt(G.escape);
     g.add(mesh(extrude([escapePoly(50)], 3.85, 0.35, 0.04), MAT.steel()));
@@ -326,9 +346,10 @@ function build(mv) {
   // ===== bariletto
   mv.add(addItem('bariletto', 'bariletto', (() => {
     const g = groupAt(G.barrel);
-    g.add(mesh(extrude([gearRing(C0, 135, 90)], 0.5, 0.65, 0.06), MAT.gold()));
-    g.add(mesh(cyl(12.4, 1.1, 4.4, 64), MAT.gold()));
-    g.add(mesh(cyl(12.0, 4.4, 4.75, 64), MAT.brass()));
+    const br = PR('barrel', 135);
+    g.add(mesh(extrude([gearRing(C0, br, Math.round(br * 0.67))], 0.5, 0.65, 0.06), MAT.gold()));
+    g.add(mesh(cyl(br * 0.092, 1.1, 4.4, 64), MAT.gold()));
+    g.add(mesh(cyl(br * 0.089, 4.4, 4.75, 64), MAT.brass()));
     g.add(mesh(cyl(2.2, 0, 7.4, 24), MAT.steel()));
     return g;
   })()));
@@ -351,12 +372,13 @@ function build(mv) {
   // ===== bilanciere + spirale
   mv.add(addItem('bilanciere', 'bilanciere', (() => {
     const g = groupAt(G.balance);
-    const wheel = [circleRing(C0, 100, 96), ...spokeHoles(C0, 86, 15, 3, 10, 0.4)];
+    const bR = PR('balance', 100);
+    const wheel = [circleRing(C0, bR, Math.round(bR * 0.96)), ...spokeHoles(C0, bR * 0.86, 15, 3, 10, 0.4)];
     g.add(mesh(extrude([wheel], 4.7, 0.6, 0.08), MAT.gold()));
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * TAU;
       const sp = mesh(new THREE.SphereGeometry(0.42, 12, 8), MAT.gold());
-      sp.position.set(Math.cos(a) * 10.1, 5.0, Math.sin(a) * 10.1);
+      sp.position.set(Math.cos(a) * bR * 0.101, 5.0, Math.sin(a) * bR * 0.101);
       g.add(sp);
     }
     g.add(mesh(cyl(0.28, 3.4, 9.6, 12), MAT.steel()));
@@ -380,31 +402,39 @@ function build(mv) {
     return g;
   })()));
   // ===== ponti
-  const trainBridge = union(
+  const trainBridge = PB('ponte_treno') ? poly(PB('ponte_treno')) : PROFILE ? union(
+    taper(G.center, G.third, 80, 70), taper(G.third, G.fourth, 70, 60), taper(G.fourth, G.escape, 60, 50),
+    circle(G.center, 42), circle(G.third, 40), circle(G.fourth, 40), circle(G.escape, 36)) : union(
     poly([[455, 455], [545, 465], [560, 560], [625, 700], [615, 772], [540, 775], [470, 752], [335, 655], [330, 575], [440, 470]]),
     circle(G.center, 42), circle(G.third, 40), circle(G.fourth, 40), circle(G.escape, 36));
+  // ponte unico bariletto+treno: il treno non ha un ponte suo
+  const merged = PROFILE && PROFILE.merged;
   mv.add(addItem('ponte_treno', 'ponte_treno', (() => {
     const g = new THREE.Group();
+    if (merged) return g;
     g.add(mesh(extrude(trainBridge, 5.4, 2.0, 0.22), MAT.bridge()));
     for (const pt of [G.center, G.third, G.fourth, G.escape]) g.add(jewel(pt, 7.4, 0.95));
-    for (const pt of [[420, 560], [560, 640], [400, 680]]) g.add(at(mesh(cyl(1.6, 0, 5.4, 20), MAT.steelMatte()), pt));
+    for (const pt of PH('ponte_treno', [[420, 560], [560, 640], [400, 680]])) g.add(at(mesh(cyl(1.6, 0, 5.4, 20), MAT.steelMatte()), pt));
     return g;
   })(), { face: 7.4, cover: true }));
   mv.add(addItem('ponte_ancora', 'ponte_ancora', (() => {
     const g = new THREE.Group();
-    g.add(mesh(extrude(bar([G.pallet[0] - 30, G.pallet[1] + 35], [G.pallet[0] + 25, G.pallet[1] - 30], 44), 5.4, 2.0, 0.2), MAT.bridge()));
+    const shp = PB('ponte_ancora') ? poly(PB('ponte_ancora')) : bar([G.pallet[0] - 30, G.pallet[1] + 35], [G.pallet[0] + 25, G.pallet[1] - 30], 44);
+    g.add(mesh(extrude(shp, 5.4, 2.0, 0.2), MAT.bridge()));
     g.add(jewel(G.pallet, 7.4, 0.75));
-    g.add(at(mesh(cyl(1.4, 0, 5.4, 20), MAT.steelMatte()), [636, 718]));
+    for (const pt of PH('ponte_ancora', [[636, 718]])) g.add(at(mesh(cyl(1.4, 0, 5.4, 20), MAT.steelMatte()), pt));
     return g;
   })(), { face: 7.4, cover: true }));
-  const barrelBridge = union(circle(G.barrel, 150, 72), circle(G.crownWheel, 72), poly([[700, 230], [830, 350], [790, 470], [650, 470]]));
+  const barrelBridge = PB('ponte_bariletto') ? poly(PB('ponte_bariletto')) : PROFILE ? union(
+    circle(G.barrel, PR('barrel', 135) + 15, 72), circle(G.crownWheel, 72), taper(G.barrel, G.crownWheel, 150, 90)) : union(circle(G.barrel, 150, 72), circle(G.crownWheel, 72), poly([[700, 230], [830, 350], [790, 470], [650, 470]]));
   mv.add(addItem('ponte_bariletto', 'ponte_bariletto', (() => {
     const g = new THREE.Group();
     g.add(mesh(extrude(barrelBridge, 5.0, 2.4, 0.22), MAT.bridge()));
-    for (const pt of [[520, 240], [760, 250], [705, 455]]) g.add(at(mesh(cyl(1.6, 0, 5.0, 20), MAT.steelMatte()), pt));
+    if (merged) for (const pt of [G.center, G.third, G.fourth, G.escape]) g.add(jewel(pt, 7.4, 0.95));
+    for (const pt of PH('ponte_bariletto', [[520, 240], [760, 250], [705, 455]])) g.add(at(mesh(cyl(1.6, 0, 5.0, 20), MAT.steelMatte()), pt));
     return g;
   })(), { face: 7.4, cover: true }));
-  const cock = union(circle(G.balance, 44), taper(G.balance, G.cockFoot, 70, 82));
+  const cock = PB('ponte_bilanciere') ? union(poly(PB('ponte_bilanciere')), circle(G.balance, 44)) : union(circle(G.balance, 44), taper(G.balance, G.cockFoot, 70, 82));
   mv.add(addItem('ponte_bilanciere', 'ponte_bilanciere', (() => {
     const g = new THREE.Group();
     g.add(mesh(extrude(cock, 7.0, 1.9, 0.2), MAT.bridge()));
@@ -426,24 +456,28 @@ function build(mv) {
   })(), { face: 8.9, cover: true }));
   mv.add(addItem('racchetta', 'racchetta', (() => {
     const g = groupAt(G.balance);
-    const r = bar([G.balance[0] - 14, G.balance[1] - 14], [G.balance[0] - 82, G.balance[1] - 82], 12);
+    const ra = (PROFILE && PROFILE.regulator != null) ? PROFILE.regulator : Math.atan2(-1, -1);
+    const r = bar(polar(G.balance, 20, ra), polar(G.balance, 115, ra), 12);
     g.add(mesh(rel(extrude(r, 8.9, 0.35, 0.05), G.balance), MAT.steel()));
     return g;
   })(), { face: 9.25 }));
   // ===== carica
   mv.add(addItem('rocchetto_cricco', 'rocchetto_cricco', (() => {
     const g = groupAt(G.barrel);
-    g.add(mesh(extrude([gearRing(C0, 105, 60)], 7.4, 0.8, 0.06), MAT.grain(tex().grain10)));
+    const rr = PR('ratchet', 105);
+    g.add(mesh(extrude([gearRing(C0, rr, Math.round(rr * 0.57))], 7.4, 0.8, 0.06), MAT.grain(tex().grain10)));
     return g;
   })(), { face: 8.2, cover: true }));
   mv.add(addItem('ruota_carica', 'ruota_carica', (() => {
     const g = groupAt(G.crownWheel);
-    g.add(mesh(extrude([gearRing(C0, 55, 40)], 7.4, 0.8, 0.06), MAT.grain(tex().grain5)));
+    const cr = PR('crown', 55);
+    g.add(mesh(extrude([gearRing(C0, cr, Math.round(cr * 0.73))], 7.4, 0.8, 0.06), MAT.grain(tex().grain5)));
     return g;
   })(), { face: 8.2 }));
   mv.add(addItem('cricchetto', 'cricchetto', (() => {
     const g = groupAt(G.click);
-    const shp = union(taper(G.click, polar(G.barrel, 109, -2.2), 30, 12), circle(G.click, 18));
+    const ca = Math.atan2(G.click[1] - G.barrel[1], G.click[0] - G.barrel[0]);
+    const shp = union(taper(G.click, polar(G.barrel, PR('ratchet', 105) + 4, ca + 0.04), 30, 12), circle(G.click, 18));
     g.add(mesh(rel(extrude(shp, 7.4, 0.6, 0.06), G.click), MAT.steel()));
     const pts = [];
     for (let i = 0; i <= 30; i++) {
@@ -454,13 +488,13 @@ function build(mv) {
     return g;
   })(), { face: 8.0 }));
   // ===== automatico
-  const autoBridge = union(
+  const autoBridge = PB('ponte_automatico') ? union(poly(PB('ponte_automatico')), circle(G.rev1, 44), circle(G.rev2, 44)) : union(
     poly([[320, 215], [560, 200], [585, 300], [560, 395], [345, 395], [300, 300]]),
     circle(G.rev1, 48), circle(G.rev2, 48));
   mv.add(addItem('ponte_automatico', 'ponte_automatico', (() => {
     const g = new THREE.Group();
     g.add(mesh(extrude(autoBridge, 9.4, 1.5, 0.18), MAT.bridge()));
-    for (const pt of [[345, 300], [560, 240]]) g.add(at(mesh(cyl(1.5, 0, 9.4, 20), MAT.steelMatte()), pt));
+    for (const pt of PH('ponte_automatico', [[345, 300], [560, 240]])) g.add(at(mesh(cyl(1.5, 0, 9.4, 20), MAT.steelMatte()), pt));
     return g;
   })(), { face: 10.9, cover: true }));
   for (const [id, pt] of [['invertitore_1', G.rev1], ['invertitore_2', G.rev2]]) {
@@ -474,12 +508,13 @@ function build(mv) {
   mv.add(addItem('rotore', 'rotore', (() => {
     const g = new THREE.Group();
     const pts = [];
-    for (let i = 0; i <= 64; i++) pts.push(polar(C0, 425, Math.PI + (i / 64) * Math.PI));
-    for (let i = 64; i >= 0; i--) pts.push(polar(C0, 62, Math.PI + (i / 64) * Math.PI));
+    const r0 = (PROFILE && PROFILE.rotor != null) ? PROFILE.rotor : Math.PI;
+    for (let i = 0; i <= 64; i++) pts.push(polar(C0, 425, r0 + (i / 64) * Math.PI));
+    for (let i = 64; i >= 0; i--) pts.push(polar(C0, 62, r0 + (i / 64) * Math.PI));
     g.add(mesh(extrude([pts], 12.6, 0.7, 0.08), MAT.grain(tex().grain42)));
     const rim = [];
-    for (let i = 0; i <= 64; i++) rim.push(polar(C0, 425, Math.PI + (i / 64) * Math.PI));
-    for (let i = 64; i >= 0; i--) rim.push(polar(C0, 378, Math.PI + (i / 64) * Math.PI));
+    for (let i = 0; i <= 64; i++) rim.push(polar(C0, 425, r0 + (i / 64) * Math.PI));
+    for (let i = 64; i >= 0; i--) rim.push(polar(C0, 378, r0 + (i / 64) * Math.PI));
     g.add(mesh(extrude([rim], 12.0, 2.0, 0.15), MAT.heavy()));
     g.add(mesh(cyl(5.6, 11.2, 13.6, 48), MAT.steel()));
     g.add(mesh(cyl(4.2, 13.6, 13.8, 48), MAT.steelMatte()));
@@ -1897,6 +1932,17 @@ function applyLayout(cfg) {
 window.W3D = {
   setup(cfg) {
     try {
+      const want = (cfg.profile && cfg.profile.id) || null;
+      const have = (PROFILE && PROFILE.id) || null;
+      if (want !== have) {
+        // ricostruisco il movimento con le forme del calibro
+        applyProfile(cfg.profile);
+        mv.clear();
+        for (const k of Object.keys(items)) delete items[k];
+        for (const k of Object.keys(screws)) delete screws[k];
+        smallSec = null;
+        build(mv);
+      }
       for (const d of cfg.screws || []) if (!screws[d.id]) buildScrew(d);
       send({ type: 'setup', items: Object.keys(items), screws: Object.keys(screws) });
     } catch (e) { send({ type: 'error', msg: String(e && e.stack || e) }); }

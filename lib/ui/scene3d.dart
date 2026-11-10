@@ -49,7 +49,10 @@ class Scene3DController {
     switch (m['type']) {
       case 'ready':
         ready = true;
-        _js('W3D.setup(${jsonEncode({'screws': screwDefs.map((s) => s.toJson()).toList()})})');
+        _js('W3D.setup(${jsonEncode({
+          'screws': screwDefs.map((s) => s.toJson()).toList(),
+          'profile': activeProfile?.toJson(),
+        })})');
         if (_layout != null) _js(_layout!);
         if (_lastShow != null) _js(_lastShow!);
         if (_lastDemo != null) _js(_lastDemo!);

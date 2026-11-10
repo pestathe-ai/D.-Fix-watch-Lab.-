@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../art/scene.dart';
+import '../art/profiles.dart';
 import '../data/calibers.dart';
 import '../data/components.dart';
 import '../data/steps.dart';
@@ -213,14 +214,18 @@ class _StepMediaCardState extends State<StepMediaCard> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Icon(Icons.info_outline, color: Brand.arancio, size: 20),
+          Icon(c?.profileId != null ? Icons.verified_outlined : Icons.info_outline,
+              color: c?.profileId != null ? Brand.blu : Brand.arancio, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              known
-                  ? 'Schema generico: il tuo ${c.name.split('(').first.trim()} ha ponti e viti in posizioni diverse. '
-                      'Pezzi e ordine sono gli stessi.'
-                  : 'Schema generico di un movimento tipico: pezzi e ordine sono gli stessi, la forma dei ponti cambia.',
+              c?.profileId != null
+                  ? 'Ricostruito dalle foto del ${movementProfiles[c!.profileId]!.name}: ponti, ruote e viti nelle posizioni vere '
+                      '(misure approssimate). Il lato quadrante è ancora schematico.'
+                  : known
+                      ? 'Schema generico: il tuo ${c.name.split('(').first.trim()} ha ponti e viti in posizioni diverse. '
+                          'Pezzi e ordine sono gli stessi.'
+                      : 'Schema generico di un movimento tipico: pezzi e ordine sono gli stessi, la forma dei ponti cambia.',
               style: const TextStyle(fontSize: 14, height: 1.35),
             ),
           ),

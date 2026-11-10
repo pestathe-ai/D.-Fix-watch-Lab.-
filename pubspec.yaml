@@ -1,7 +1,7 @@
 name: d_fix_watch_lab
 description: "D. Fix Watch Lab – guida passo passo alla revisione di orologi meccanici."
 publish_to: 'none'
-version: 0.13.0+16
+version: 0.14.0+17
 
 environment:
   sdk: ^3.6.0
