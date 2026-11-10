@@ -1778,6 +1778,18 @@ const List<Caliber> calibers = [
       'PS32 è la versione più grande (11½ linee); PS32C ha la data, PS33C giorno e data.',
     ],
   ),
+  Caliber(
+    id: 'omega650',
+    engravings: ['650', 'OMEGA650'],
+    name: 'Omega 650 (manuale)',
+    type: WindType.manual,
+    jewels: 17,
+    hasDate: false,
+    notes: [
+      'Calibro vintage: i ricambi sono rari, lavora con calma e fotografa ogni passaggio.',
+      'Ruota del cricchetto e ruota della corona a vista sul ponte del bariletto.',
+    ],
+  ),
 ];
 
 /// Calibri con i secondi piccoli (lancetta dei secondi su un quadrantino a parte).

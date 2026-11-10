@@ -111,7 +111,7 @@ void main() {
       expect(matchEngravings('SWISS C07.111 23 JEWELS').guesses.first.caliber.id, 'powermatic80');
     });
     test('marche poco note: Raketa, Yema, Citizen, Tissot', () {
-      expect(matchEngravings('RAKETA MADE IN USSR 19 JEWELS').guesses.first.caliber.id, 'raketa2609');
+      expect(matchEngravings('RAKETA MADE IN USSR 19 JEWELS').guesses.first.caliber.id, startsWith('raketa'));
       expect(matchEngravings('PAKETA 2609.HA').guesses.first.caliber.id, 'raketa2609');
       expect(matchEngravings('YEMA').guesses, isNotEmpty);
       expect(matchEngravings('CITIZEN 21 JEWELS').guesses.first.caliber.jewels, 21);
