@@ -304,7 +304,7 @@ EngravingInfo matchEngravings(String rawText) {
         final why = ['letto "${_title(b.key)}" ma non il numero del calibro'];
         if (jewels != null && c.jewels != null) {
           if ((c.jewels! - jewels).abs() <= 1) {
-            sc += 0.2;
+            sc += c.jewels == jewels ? 0.22 : 0.12; // esatto conta di più
             why.add('$jewels rubini: coincide');
           } else {
             sc -= 0.15;
